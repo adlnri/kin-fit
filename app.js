@@ -954,7 +954,7 @@
     const groups = [['all', 'Tout'], ['bas', 'Bas du corps'], ['haut', 'Haut du corps'], ['tronc', 'Tronc et gainage']];
     return `<header class="hello"><div><h1 class="h1">Exercices</h1><p class="lede">Tous les exercices de ton programme, adaptés à ton matériel. Touche-en un pour voir comment le faire et quel poids prendre.</p></div></header>${tabs}
       <div class="seg lib-filter" role="group" aria-label="Zone du corps">${groups.map(([k, l]) => `<button type="button" data-libz="${k}" aria-pressed="${z === k}">${l}</button>`).join('')}</div>
-      <div class="lib-grid">${ids.map((id) => { const d = X ? X.detail(id, p) : { name: variant(E[id], p).n, zones: [] }; return `<button type="button" class="card lib-card" data-exo="${id}">${X ? X.bodyMap(d.zones) : ''}<b data-no-i18n>${esc(d.name)}</b><small>${esc(E[id].m)}</small></button>`; }).join('')}</div>${foot()}`;
+      <div class="lib-grid">${ids.map((id) => { const d = X ? X.detail(id, p) : { name: variant(E[id], p).n, zones: [] }; return `<button type="button" class="card lib-card" data-exo="${id}">${X ? (d.photos ? `<img class="lib-ph" src="${d.photos[1]}" alt="" loading="lazy" decoding="async">` : X.bodyMap(d.zones)) : ''}<b data-no-i18n>${esc(d.name)}</b><small>${esc(E[id].m)}</small></button>`; }).join('')}</div>${foot()}`;
   }
 
   function viewPlan(sess) {
@@ -1278,7 +1278,8 @@
     const dlg = document.createElement('dialog'); dlg.id = 'exo'; dlg.className = 'dlg dlg--full exo'; dlg.setAttribute('aria-labelledby', 'exo-title');
     dlg.innerHTML = `<div class="dlg-body">
       <header class="dlg-head"><div><h2 class="h2" id="exo-title" data-no-i18n>${esc(d.name)}</h2><p class="muted">${esc(d.muscles)}</p></div><button type="button" class="round" data-act="exo-close" aria-label="Fermer">${icon('x')}</button></header>
-      ${window.NA_EXO.bodyMap(d.zones)}
+      ${window.NA_EXO.anim(d)}
+      ${d.photos ? window.NA_EXO.bodyMap(d.zones) : ''}
       <dl class="facts exo-facts"><div><dt>Séries × répétitions</dt><dd>${sr.txt}</dd></div><div><dt>Repos</dt><dd>${d.rest} s</dd></div><div><dt>Charge</dt><dd data-no-i18n>${esc(d.load)}</dd></div></dl>
       <section class="exo-part"><h3 class="h3">Quel poids prendre ?</h3><p data-no-i18n>${esc(d.tip)}</p></section>
       <section class="exo-part"><h3 class="h3">Comment faire</h3><ol class="exo-steps" data-no-i18n>${d.steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol><p><b>Respiration et posture.</b> ${esc(d.tech)}</p></section>
@@ -1360,7 +1361,7 @@
         body = `${head(pct, g.item.title)}<div class="g-main"><p class="label">Exercice ${esc(st.label)} · série ${st.set}/${st.sets}</p>
           <h2 class="g-name" data-no-i18n>${esc(d.name)}</h2>
           <p class="g-reps"><b>${st.reps}</b><span>répétitions</span></p><p class="g-load" data-no-i18n>${esc(d.load)}</p>
-          ${window.NA_EXO ? window.NA_EXO.bodyMap(d.zones) : ''}
+          ${window.NA_EXO ? window.NA_EXO.anim(d, true) : ''}
           <div class="actions g-actions"><button type="button" class="btn btn--ghost" data-exo="${st.id}">${icon('album')}Fiche</button><button type="button" class="btn btn--big btn--sheen" data-act="g-set">${icon('check')}Série faite</button></div>
           <p class="hint">${st.rest ? `Puis ${st.rest} s de repos.` : 'Enchaîne directement avec l’exercice suivant.'}</p></div>`;
       }

@@ -128,13 +128,47 @@
       ${names ? `<figcaption>${names}</figcaption>` : ''}</figure>`;
   }
 
+  // Start and end photos per variant (gym/dumb/band/body), from Free Exercise DB (public domain), in images/exo/.
+  const PHOTOS = {
+    squat: { gym: 'Barbell_Squat', dumb: 'Goblet_Squat', body: 'Bodyweight_Squat' },
+    fente: { all: 'Split_Squat_with_Dumbbells' },
+    rdl: { gym: 'Romanian_Deadlift', dumb: 'Stiff-Legged_Dumbbell_Deadlift', band: 'Band_Good_Morning', body: 'Stiff-Legged_Dumbbell_Deadlift' },
+    hip: { gym: 'Barbell_Hip_Thrust', dumb: 'Barbell_Hip_Thrust', body: 'Single_Leg_Glute_Bridge' },
+    mollet: { gym: 'Standing_Calf_Raises', dumb: 'Calf_Raise_On_A_Dumbbell', body: 'Standing_Calf_Raises' },
+    planche: { all: 'Plank' },
+    bench: { gym: 'Barbell_Bench_Press_-_Medium_Grip', dumb: 'Dumbbell_Bench_Press', body: 'Pushups' },
+    row: { gym: 'Bent_Over_Barbell_Row', dumb: 'One-Arm_Dumbbell_Row', band: 'Seated_Cable_Rows', body: 'Inverted_Row' },
+    ohp: { gym: 'Dumbbell_Shoulder_Press', dumb: 'Dumbbell_Shoulder_Press' },
+    pull: { gym: 'Wide-Grip_Lat_Pulldown', band: 'Band_Assisted_Pull-Up', body: 'Superman' },
+    face: { gym: 'Face_Pull', band: 'Band_Pull_Apart' },
+    pallof: { gym: 'Pallof_Press', band: 'Pallof_Press', body: 'Side_Bridge' },
+    deadlift: { gym: 'Barbell_Deadlift', dumb: 'Stiff-Legged_Dumbbell_Deadlift', band: 'Barbell_Deadlift' },
+    thruster: { gym: 'Kettlebell_Thruster', dumb: 'Kettlebell_Thruster', body: 'Freehand_Jump_Squat' },
+    traction: { gym: 'Pullups', band: 'Band_Assisted_Pull-Up', body: 'Inverted_Row' },
+    farmer: { all: 'Farmers_Walk' },
+    chop: { body: 'Russian_Twist' },
+    deadbug: { all: 'Dead_Bug' },
+  };
+  function photos(id, ex, v) {
+    const m = PHOTOS[id]; if (!m) return null;
+    const kind = ['gym', 'dumb', 'band', 'body'].find((k) => ex[k] === v);
+    const f = m.all || (kind && m[kind]); return f ? [0, 1].map((n) => `images/exo/${f}-${n}.jpg`) : null;
+  }
+
+  // Start and end photos crossfading in a loop; gold turns them into a glowing silhouette for the guided session.
+  const CREDIT = { fr: 'Photos : Free Exercise DB, domaine public', en: 'Photos: Free Exercise DB, public domain', es: 'Fotos: Free Exercise DB, dominio público' };
+  function anim(d, gold) {
+    if (!d.photos) return bodyMap(d.zones);
+    return `<figure class="exo-anim${gold ? ' exo-anim--gold' : ''}" data-no-i18n><div class="exo-frames">${d.photos.map((src, i) => `<img src="${src}" alt="${i ? '' : d.name}" decoding="async">`).join('')}</div>${gold ? '' : `<figcaption>${CREDIT[L()]}</figcaption>`}</figure>`;
+  }
+
   // The sheet content for an exercise, with the variant and load that fit this profile.
   function detail(id, p) {
     const ex = NA.E[id]; const x = X[id] || { zones: [] }; const t = x[L()] || x.fr || { steps: [], easy: '', hard: '' };
     const v = NA.variant(ex, p); const load = NA.loadText(v, p);
     const kind = v.kg != null ? 'kg' : /lastique|band|goma/i.test(load) ? 'band' : 'txt';
-    return { id, name: v.n, muscles: ex.m, zones: x.zones, steps: t.steps, easy: t.easy, hard: t.hard, tech: ex.tech, err: ex.err, load, tip: TIPS[L()][kind](load), rest: NA.restOf(ex, p) };
+    return { id, name: v.n, muscles: ex.m, zones: x.zones, steps: t.steps, easy: t.easy, hard: t.hard, tech: ex.tech, err: ex.err, load, tip: TIPS[L()][kind](load), rest: NA.restOf(ex, p), photos: photos(id, ex, v) };
   }
 
-  window.NA_EXO = { detail, bodyMap, has: (id) => !!X[id] };
+  window.NA_EXO = { detail, bodyMap, anim, has: (id) => !!X[id] };
 })();

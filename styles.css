@@ -861,6 +861,7 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 .g-reps { display: grid; line-height: 1; } .g-reps b { font-family: var(--display); font-weight: 800; font-size: 4rem; color: var(--gold-hi); } .g-reps span { color: var(--text-2); font-weight: 600; }
 .g-load { font-weight: 700; color: var(--text); }
 .g-main .bodymap svg { width: min(100%, 220px); }
+.g-main .exo-anim { width: min(100%, 300px); }
 .g-actions { justify-content: center; }
 .g-ring { position: relative; width: min(64vw, 240px); aspect-ratio: 1; display: grid; place-items: center; }
 .g-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); filter: drop-shadow(0 8px 20px rgba(212, 175, 55, .3)); }
@@ -913,3 +914,16 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
   .food-rows { width: 100%; }
   .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- Exercise photos ---------- */
+.exo-anim { margin: 0; display: grid; gap: 6px; }
+.exo-frames { position: relative; aspect-ratio: 4 / 3; border-radius: 16px; overflow: hidden; background: #fff; border: 1px solid rgba(212, 175, 55, .35); }
+.exo-frames img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.exo-frames img:last-child { animation: exo-swap 2.4s ease-in-out infinite; }
+@keyframes exo-swap { 0%, 38% { opacity: 0; } 50%, 88% { opacity: 1; } 100% { opacity: 0; } }
+.exo-anim figcaption { font-size: .72rem; color: var(--muted, #9a9384); text-align: right; }
+.exo-anim--gold .exo-frames { background: #000; border-color: rgba(212, 175, 55, .5); box-shadow: 0 0 40px -12px rgba(212, 175, 55, .55) inset; }
+.exo-anim--gold .exo-frames img { filter: grayscale(1) sepia(1) saturate(2.4) hue-rotate(-6deg) brightness(.82) contrast(1.25); }
+.exo-anim--gold .exo-frames::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, .75) 100%); pointer-events: none; }
+.lib-ph { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #fff; border-radius: 12px; }
+@media (prefers-reduced-motion: reduce) { .exo-frames img:last-child { animation: none; opacity: 0; } }

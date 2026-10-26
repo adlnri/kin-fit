@@ -50,6 +50,7 @@ Puis ouvrir <http://127.0.0.1:4180/>.
 | `netlify.toml`, `package.json`, `scripts/build.mjs` | Déploiement Netlify (copie de l'app dans `dist/`) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Application installable et hors ligne |
 | `images/`, `scripts/silk.py` | Fond « soie d’or » de l’accueil, généré par script (aucune photo ni banque d’images) |
+| `images/exo/` | Photos début / fin de mouvement des exercices, tirées de [Free Exercise DB](https://github.com/yuhonas/free-exercise-db) (licence Unlicense, domaine public), redimensionnées en 480 px |
 | `fonts/` | Polices auto-hébergées (Manrope, Sora, Dela Gothic One — licence SIL OFL) |
 | `PRODUCT.md`, `DESIGN.md`, `.impeccable/` | Documentation produit et design |
 
