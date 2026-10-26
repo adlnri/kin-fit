@@ -28,6 +28,18 @@
   /* Strings added after the bulk translation (welcome, budget, regions, alternatives, patterns' words). */
   const EXTRA = {
     'Bienvenue': ['Welcome', 'Bienvenido'],
+    "Ouvre Google AI Studio": ["Open Google AI Studio", "Abre Google AI Studio"],
+    "Connecte-toi avec ton compte Google et accepte les conditions la première fois, puis touche « Create API key ».": ["Sign in with your Google account and accept the terms the first time, then tap “Create API key”.", "Inicia sesión con tu cuenta de Google y acepta las condiciones la primera vez; luego toca «Create API key»."],
+    "Ouvrir Google AI Studio": ["Open Google AI Studio", "Abrir Google AI Studio"],
+    "Copie ta clé": ["Copy your key", "Copia tu clave"],
+    "Elle commence par AIza. Touche l’icône de copie à côté de la clé.": ["It starts with AIza. Tap the copy icon next to the key.", "Empieza por AIza. Toca el icono de copiar junto a la clave."],
+    "Reviens ici et colle-la": ["Come back here and paste it", "Vuelve aquí y pégala"],
+    "Kin Fit la lit, vérifie qu’elle marche et se connecte.": ["Kin Fit reads it, checks it works and connects.", "Kin Fit la lee, comprueba que funciona y se conecta."],
+    "Coller et connecter": ["Paste and connect", "Pegar y conectar"],
+    "Coller la clé à la main": ["Paste the key by hand", "Pegar la clave a mano"],
+    "Ce n’est pas une clé Gemini : elle doit commencer par AIza. Recopie-la depuis Google AI Studio.": ["That is not a Gemini key: it must start with AIza. Copy it again from Google AI Studio.", "No es una clave de Gemini: debe empezar por AIza. Cópiala de nuevo desde Google AI Studio."],
+    "Je n’ai pas pu lire le presse-papiers. Colle la clé dans le champ ci-dessous (appui long, puis Coller).": ["I could not read the clipboard. Paste the key in the field below (long-press, then Paste).", "No he podido leer el portapapeles. Pega la clave en el campo de abajo (mantén pulsado y luego Pegar)."],
+    "Clé copiée ? Touche « Coller et connecter ».": ["Key copied? Tap “Paste and connect”.", "¿Clave copiada? Toca «Pegar y conectar»."],
     "page des clés de Google AI Studio": ["Google AI Studio keys page", "página de claves de Google AI Studio"],
     "et connecte-toi avec ton compte Google (accepte les conditions la première fois).": ["and sign in with your Google account (accept the terms the first time).", "e inicia sesión con tu cuenta de Google (acepta las condiciones la primera vez)."],
     "Ouvre la": ["Open the", "Abre la"],

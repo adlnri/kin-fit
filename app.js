@@ -1107,6 +1107,16 @@
   const aiErr = (e) => AI_ERR[e && e.code] || 'Ça n’a pas marché. Réessaie dans un moment.';
   const localProgress = (r) => `Chargement du modèle sur ton appareil : ${Math.round((r.progress || 0) * 100)} %`;
 
+  // Checks the key format, then asks Google once before saving it on this device.
+  function connectGemini(raw, btn) {
+    const st = $('#gemini-status'); const m = String(raw || '').match(/AIza[0-9A-Za-z_-]{30,}/);
+    if (!m) { st.textContent = raw && raw.trim() ? 'Ce n’est pas une clé Gemini : elle doit commencer par AIza. Recopie-la depuis Google AI Studio.' : 'Colle d’abord ta clé Gemini.'; return; }
+    const key = m[0]; st.textContent = 'Vérification de la clé auprès de Google…'; if (btn) btn.disabled = true;
+    AI.testGemini(key)
+      .then(() => { AI.setConfig({ provider: 'gemini', key }); ui.aiPick = 'gemini'; ui.geminiBack = false; render(); toast('Gemini est connecté.'); })
+      .catch((err) => { if (btn) btn.disabled = false; st.textContent = aiErr(err); });
+  }
+
   function aiSettingsCard(sess) {
     const c = AI.config; const cur0 = AI.provider;
     const pick = ui.aiPick || (c.provider && c.provider !== 'server' ? c.provider : cur0);
@@ -1114,9 +1124,15 @@
     const opt = (v, title, desc, dis) => `<label class="choice choice--block"><input type="radio" name="aiprov" value="${v}"${pick === v ? ' checked' : ''}${dis ? ' disabled' : ''}><span><b>${title}</b><small>${desc}</small></span></label>`;
     const now = { none: 'sans IA, exemples de l’app', gemini: 'Gemini, avec ta clé', local: 'IA sur ton appareil (coach)', server: 'serveur Kin Fit' }[cur0];
     const gemini = `<form id="gemini-form" class="ai-block" novalidate>
-        <ol class="ai-steps"><li>Ouvre la <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">page des clés de Google AI Studio</a> et connecte-toi avec ton compte Google (accepte les conditions la première fois).</li><li>Touche « Create API key » (« Créer une clé API »), choisis ou crée un projet, puis copie la clé qui commence par AIza.</li><li>Colle-la ici et touche Connecter. Kin Fit vérifie qu’elle marche.</li></ol>
-        <div class="field"><label for="gemini-key">Ta clé Gemini</label><input class="input" id="gemini-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${c.key ? 'Clé enregistrée sur cet appareil' : 'Colle ta clé ici'}"></div>
-        <div class="actions"><button type="submit" class="btn">${c.key ? 'Changer de clé' : 'Connecter'}</button>${c.key ? '<button type="button" class="btn btn--ghost" data-act="gemini-forget">Retirer la clé</button>' : ''}</div>
+        ${cur0 === 'gemini' ? '' : `<ol class="wizard">
+          <li><span class="wz-n">1</span><div><b>Ouvre Google AI Studio</b><p class="hint">Connecte-toi avec ton compte Google et accepte les conditions la première fois, puis touche « Create API key ».</p><a class="btn btn--glass" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" data-act="gemini-open">${icon('link')}Ouvrir Google AI Studio</a></div></li>
+          <li><span class="wz-n">2</span><div><b>Copie ta clé</b><p class="hint">Elle commence par AIza. Touche l’icône de copie à côté de la clé.</p></div></li>
+          <li><span class="wz-n">3</span><div><b>Reviens ici et colle-la</b><p class="hint">Kin Fit la lit, vérifie qu’elle marche et se connecte.</p><button type="button" class="btn btn--big btn--sheen${ui.geminiBack ? ' is-ready' : ''}" data-act="gemini-paste">Coller et connecter</button></div></li>
+        </ol>`}
+        <details class="gemini-manual"${cur0 === 'gemini' ? ' open' : ''}><summary>${cur0 === 'gemini' ? 'Changer de clé' : 'Coller la clé à la main'}</summary>
+          <div class="field"><label for="gemini-key">Ta clé Gemini</label><input class="input" id="gemini-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${c.key ? 'Clé enregistrée sur cet appareil' : 'AIza…'}"></div>
+          <div class="actions"><button type="submit" class="btn">Connecter</button>${c.key ? '<button type="button" class="btn btn--ghost" data-act="gemini-forget">Retirer la clé</button>' : ''}</div>
+        </details>
         <p class="hint ai-status" id="gemini-status" role="status">${cur0 === 'gemini' ? 'Gemini est connecté sur cet appareil.' : ''}</p>
         <div class="note ai-terms"><p><b>À savoir avant de connecter.</b> Ton profil (âge, taille, poids, objectif, sport, restrictions, alimentation) part directement de ton appareil vers Google, avec ta clé. Kin Fit ne voit ni ta clé ni les réponses.</p>
           <p>Avec l’offre gratuite, Google peut utiliser ces échanges pour améliorer ses services et les faire relire par des personnes : n’écris pas de détails médicaux.</p>
@@ -1542,6 +1558,7 @@
     return (await copyText(url)) ? 'copié' : '';
   }
 
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-act="gemini-open"]')) ui.geminiAway = true; });
   document.addEventListener('click', async (e) => {
     const t = e.target.closest('button'); if (!t) return;
     const sess = cur();
@@ -1665,6 +1682,15 @@
     if (a === 'account-delete-yes') {
       try { await CLOUD.deleteAccount(); state.sessions.forEach((x) => { delete x.uid; x.inbox = (x.inbox || []).filter((y) => !y.cloud); }); ui.confirmDeleteAccount = false; ui.friends = null; save(); render(); toast('Compte supprimé. Les données de cet appareil restent.'); }
       catch (err) { toast(cloudErr(err)); }
+      return;
+    }
+    if (a === 'gemini-paste') {
+      let text = '';
+      try { text = await navigator.clipboard.readText(); } catch (err) { text = ''; }
+      if (text) return connectGemini(text, t);
+      const det = $('.gemini-manual'); if (det) det.open = true;
+      $('#gemini-status').textContent = 'Je n’ai pas pu lire le presse-papiers. Colle la clé dans le champ ci-dessous (appui long, puis Coller).';
+      const inp = $('#gemini-key'); if (inp) inp.focus();
       return;
     }
     if (a === 'gemini-forget') { AI.setConfig({ provider: 'none', key: '' }); ui.aiPick = 'none'; render(); toast('Clé Gemini retirée de cet appareil.'); return refocus('input[name="aiprov"][value="none"]'); }
@@ -1801,12 +1827,7 @@
       return;
     }
     if (e.target.id === 'gemini-form') {
-      e.preventDefault(); const key = $('#gemini-key').value.trim(); const st = $('#gemini-status'); const btn = e.target.querySelector('[type="submit"]');
-      if (!key) { st.textContent = 'Colle d’abord ta clé Gemini.'; return; }
-      st.textContent = 'Vérification de la clé auprès de Google…'; btn.disabled = true;
-      AI.testGemini(key)
-        .then(() => { AI.setConfig({ provider: 'gemini', key }); ui.aiPick = 'gemini'; render(); toast('Gemini est connecté.'); })
-        .catch((err) => { btn.disabled = false; st.textContent = aiErr(err); });
+      e.preventDefault(); connectGemini($('#gemini-key').value, e.target.querySelector('[type="submit"]'));
       return;
     }
     if (e.target.id === 'welcome-form' || e.target.id === 'prefs-form') {
@@ -1839,6 +1860,13 @@
   if (state.pendingShare && cur()) ui.view = 'defis';
   if (cur()) settle(cur(), true);
   render();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && ui.geminiAway && AI.provider !== 'gemini') {
+      ui.geminiAway = false; ui.geminiBack = true;
+      if (ui.view === 'profil') { render(); const b = $('[data-act="gemini-paste"]'); if (b) b.scrollIntoView({ block: 'center' }); }
+      toast('Clé copiée ? Touche « Coller et connecter ».');
+    }
+  });
   if (CLOUD.enabled) {
     CLOUD.onChange(() => linkAccount());
     CLOUD.start().then((ok) => { if (ok) linkAccount(); });

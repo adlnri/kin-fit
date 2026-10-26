@@ -876,3 +876,16 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 
 .dlg--full { background: radial-gradient(70% 40% at 50% 0%, rgba(212, 175, 55, .12), transparent 70%), var(--bg); }
 .dlg--full::backdrop { background: rgba(5, 4, 3, .92); }
+
+/* ---------- Gemini wizard ---------- */
+.wizard { list-style: none; display: grid; gap: 14px; }
+.wizard li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; align-items: start; }
+.wizard li > div { display: grid; gap: 6px; justify-items: start; }
+.wz-n { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--gold-fill); color: var(--on); font-weight: 800; }
+.wizard .btn { width: 100%; }
+.wizard .btn.is-ready { animation: ready-pulse 1.6s var(--ease) 3; }
+@keyframes ready-pulse { 0%, 100% { box-shadow: 0 1px 0 rgba(255, 255, 255, .45) inset, 0 14px 30px -12px rgba(212, 175, 55, .7); } 50% { box-shadow: 0 1px 0 rgba(255, 255, 255, .45) inset, 0 0 0 6px rgba(212, 175, 55, .25), 0 14px 30px -8px rgba(212, 175, 55, .9); } }
+@media (prefers-reduced-motion: reduce) { .wizard .btn.is-ready { animation: none; } }
+.gemini-manual summary { cursor: pointer; color: var(--gold-hi); font-weight: 700; padding: 6px 0; }
+.gemini-manual[open] { display: grid; gap: 10px; }
+.wizard a.btn { text-decoration: none; }
