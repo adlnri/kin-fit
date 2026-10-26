@@ -829,3 +829,50 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 }
 @keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .dlg--sheet[open] { animation: none; } }
+
+/* ---------- Exercise sheet ---------- */
+.exo-btn { display: inline-flex; align-items: center; gap: 6px; width: fit-content; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(243, 220, 140, .3); background: rgba(212, 175, 55, .1); color: var(--gold-hi); font-weight: 700; font-size: .875rem; }
+.exo-btn .ico { width: 16px; height: 16px; }
+.dlg--full { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 40px); }
+.dlg--full .dlg-body { gap: 16px; }
+.exo-part { display: grid; gap: 8px; }
+.exo-steps { list-style: none; counter-reset: st; display: grid; gap: 10px; }
+.exo-steps li { counter-increment: st; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; }
+.exo-steps li::before { content: counter(st); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--gold-fill); color: var(--on); font-weight: 800; font-size: .875rem; }
+.exo-vars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.exo-vars > div { padding: 12px 14px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--line); display: grid; gap: 4px; }
+.exo-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bodymap { margin: 0; display: grid; justify-items: center; gap: 4px; }
+.bodymap svg { width: min(100%, 300px); height: auto; }
+.bm-base { fill: var(--surface-3); }
+.bm-zone { fill: rgba(246, 238, 220, .07); }
+.bm-zone.is-on { fill: var(--gold); filter: drop-shadow(0 0 6px rgba(212, 175, 55, .6)); }
+.bodymap text { fill: var(--text-2); font: 600 9px var(--body); }
+.bodymap figcaption { color: var(--gold-hi); font-weight: 700; font-size: .875rem; text-align: center; }
+/* ---------- Guided session ---------- */
+.guide .g-body { gap: 18px; min-height: min(640px, calc(100vh - 80px)); }
+.g-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+.g-bar { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.g-bar i { display: block; height: 100%; background: var(--gold-fill); border-radius: 999px; transition: width .4s var(--ease); }
+.g-title { grid-column: 1 / -1; color: var(--text-2); font-weight: 600; font-size: .9375rem; }
+.g-main { display: grid; justify-items: center; text-align: center; gap: 12px; align-content: center; flex: 1; }
+.g-name { font-family: var(--title); font-weight: 400; font-size: clamp(1.8rem, 7vw, 2.6rem); line-height: 1.05; text-wrap: balance; }
+.g-sub { color: var(--text-2); max-width: 46ch; }
+.g-reps { display: grid; line-height: 1; } .g-reps b { font-family: var(--display); font-weight: 800; font-size: 4rem; color: var(--gold-hi); } .g-reps span { color: var(--text-2); font-weight: 600; }
+.g-load { font-weight: 700; color: var(--text); }
+.g-main .bodymap svg { width: min(100%, 220px); }
+.g-actions { justify-content: center; }
+.g-ring { position: relative; width: min(64vw, 240px); aspect-ratio: 1; display: grid; place-items: center; }
+.g-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); filter: drop-shadow(0 8px 20px rgba(212, 175, 55, .3)); }
+.g-ring .ring-track { fill: rgba(10, 9, 7, .6); stroke: rgba(243, 220, 140, .12); stroke-width: 10; }
+.g-ring .ring-val { fill: none; stroke: url(#g-gold); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.g-ring p { position: relative; display: grid; line-height: 1; } .g-ring b { font-family: var(--display); font-weight: 800; font-size: 3.4rem; color: var(--gold-hi); } .g-ring span { color: var(--text-2); font-weight: 600; margin-top: 6px; }
+.g-next { color: var(--text-2); } .g-next b { color: var(--text); }
+.g-trophy { width: 72px; height: 72px; color: var(--gold); filter: drop-shadow(0 0 18px rgba(212, 175, 55, .6)); }
+@media (max-width: 820px) {
+  .dlg--full { width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border-radius: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  .exo-vars, .exo-facts { grid-template-columns: minmax(0, 1fr); }
+}
+
+.dlg--full { background: radial-gradient(70% 40% at 50% 0%, rgba(212, 175, 55, .12), transparent 70%), var(--bg); }
+.dlg--full::backdrop { background: rgba(5, 4, 3, .92); }

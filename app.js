@@ -453,6 +453,7 @@
         <h4>${pair && opts.check ? `<span class="pair-tag">${pair.label}</span> ` : ''}${esc(v.n)}</h4>
         <p class="ex-meta"><span data-sr="${id}" data-i="${i}">${setsReps(ex, p, sess.seed, i).txt}</span> · ${rest} · <span data-w="${id}">${esc(loadText(v, p))}</span></p>
         <p class="ex-muscle">${esc(ex.m)}</p>
+        <button type="button" class="exo-btn" data-exo="${id}">${icon('album')}Voir la fiche</button>
         ${exDetails(id, v, ex, sd, item.tpl.key)}
       </div>
     </li>`;
@@ -1197,6 +1198,125 @@
     dlg.showModal();
   }
 
+  /* ---------- Exercise sheet ---------- */
+
+  function openExo(id) {
+    const sess = cur(); if (!sess || !window.NA_EXO || !E[id]) return;
+    const old = $('#exo'); if (old) old.remove();
+    const sv = dayView(sess, todayIdx); const p = sv.profile; const ex = E[id]; const sd = sportData(sess.profile);
+    const d = window.NA_EXO.detail(id, p);
+    const it = sv.rest ? null : buildPlan(sv).byDay(todayIdx); const idx = it && it.ex ? Math.max(0, it.ex.indexOf(id)) : 0;
+    const sr = setsReps(ex, p, sess.seed, idx);
+    const dlg = document.createElement('dialog'); dlg.id = 'exo'; dlg.className = 'dlg dlg--full exo'; dlg.setAttribute('aria-labelledby', 'exo-title');
+    dlg.innerHTML = `<div class="dlg-body">
+      <header class="dlg-head"><div><h2 class="h2" id="exo-title" data-no-i18n>${esc(d.name)}</h2><p class="muted">${esc(d.muscles)}</p></div><button type="button" class="round" data-act="exo-close" aria-label="Fermer">${icon('x')}</button></header>
+      ${window.NA_EXO.bodyMap(d.zones)}
+      <dl class="facts exo-facts"><div><dt>Séries × répétitions</dt><dd>${sr.txt}</dd></div><div><dt>Repos</dt><dd>${d.rest} s</dd></div><div><dt>Charge</dt><dd data-no-i18n>${esc(d.load)}</dd></div></dl>
+      <section class="exo-part"><h3 class="h3">Quel poids prendre ?</h3><p data-no-i18n>${esc(d.tip)}</p></section>
+      <section class="exo-part"><h3 class="h3">Comment faire</h3><ol class="exo-steps" data-no-i18n>${d.steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol><p><b>Respiration et posture.</b> ${esc(d.tech)}</p></section>
+      <p class="note"><b>Erreur à éviter.</b> ${esc(d.err)}</p>
+      <div class="exo-vars"><div><p class="label">Plus facile</p><p data-no-i18n>${esc(d.easy)}</p></div><div><p class="label">Plus dur</p><p data-no-i18n>${esc(d.hard)}</p></div></div>
+      <p><b>Pourquoi pour ton sport.</b> ${esc(sd[ex.key] || '')}</p>
+      <p><a href="${yt(d.name + ' technique')}" target="_blank" rel="noopener">${icon('link')}Chercher « ${esc(d.name)} technique » sur YouTube</a></p>
+    </div>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener('close', () => dlg.remove());
+    dlg.showModal();
+  }
+
+  /* ---------- Guided session ---------- */
+
+  // One step per set; express pairs alternate A and B, with the rest only after B.
+  function guideSteps(sv, item) {
+    const p = sv.profile; const n = item.ex.length; const out = []; const groups = [];
+    for (let i = 0; i < n;) { const pr = pairOf(i, n, p); if (pr && pr.first) { groups.push([i, i + 1]); i += 2; } else { groups.push([i]); i += 1; } }
+    groups.forEach((g) => {
+      const sets = Math.max(...g.map((i) => setsReps(E[item.ex[i]], p, sv.seed, i).s));
+      for (let k = 1; k <= sets; k++) {
+        g.forEach((i, j) => {
+          const ex = E[item.ex[i]]; const sr = setsReps(ex, p, sv.seed, i); if (k > sr.s) return;
+          const pr = pairOf(i, n, p);
+          out.push({ id: item.ex[i], i, set: k, sets: sr.s, reps: sr.r, rest: j < g.length - 1 ? 0 : restOf(ex, p), last: k === sr.s, label: pr ? pr.label : String(i + 1) });
+        });
+      }
+    });
+    return out;
+  }
+
+  let guideTimer = null; let wakeLock = null;
+  async function keepAwake(on) {
+    try { if (on && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; } } catch (e) { /* not supported */ }
+  }
+
+  function openGuide() {
+    const sess = cur(); if (!sess) return;
+    const sv = dayView(sess, todayIdx); const item = sv.rest ? null : buildPlan(sv).byDay(todayIdx); if (!item) return;
+    ui.guide = item.kind === 'muscu'
+      ? { kind: 'muscu', item, sv, steps: guideSteps(sv, item), k: 0, phase: 'work', left: 0, total: 0, restTotal: 1 }
+      : { kind: 'cardio', item, sv, steps: [], k: 0, phase: 'cardio', left: item.duree * 60, total: item.duree * 60, paused: true };
+    const old = $('#guide'); if (old) old.remove();
+    const dlg = document.createElement('dialog'); dlg.id = 'guide'; dlg.className = 'dlg dlg--full guide'; dlg.setAttribute('aria-label', 'Séance guidée');
+    document.body.appendChild(dlg);
+    dlg.addEventListener('close', () => { clearInterval(guideTimer); keepAwake(false); dlg.remove(); const s = cur(); ui.guide = null; if (s) { settle(s); render(); } });
+    renderGuide(); dlg.showModal(); keepAwake(true);
+  }
+
+  function ringSvg(frac, label, sub) {
+    const C = 2 * Math.PI * 70;
+    return `<div class="g-ring"><svg viewBox="0 0 160 160" aria-hidden="true"><defs><linearGradient id="g-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e3a1"/><stop offset=".5" stop-color="#d4af37"/><stop offset="1" stop-color="#8a6416"/></linearGradient></defs><circle class="ring-track" cx="80" cy="80" r="70"/><circle class="ring-val" id="g-ring" cx="80" cy="80" r="70" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - frac)).toFixed(1)}"/></svg><p><b id="g-left">${label}</b><span>${sub}</span></p></div>`;
+  }
+  const mmss = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+
+  function renderGuide() {
+    const g = ui.guide; const dlg = $('#guide'); if (!g || !dlg) return;
+    const sess = cur(); const p = g.sv.profile;
+    const head = (pct, title) => `<header class="g-head"><button type="button" class="round" data-act="g-quit" aria-label="Quitter la séance">${icon('x')}</button><div class="g-bar" role="progressbar" aria-label="Progression de la séance" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></div><p class="g-title">${esc(title)}</p></header>`;
+    let body = '';
+    if (g.phase === 'done') {
+      const kcal = g.kind === 'muscu' ? sessionMeta(g.item, p, sess.seed).kcal : g.item.kcal;
+      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">Séance terminée !</h2><p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : ''}≈ ${kcal} kcal dépensées</p><p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div>`;
+    } else if (g.kind === 'cardio') {
+      const it = g.item;
+      body = `${head(((g.total - g.left) / g.total) * 100, it.title)}<div class="g-main"><h2 class="g-name">${esc(it.type)}</h2><p class="g-sub">${esc(it.format)}</p>
+        ${ringSvg(g.left / g.total, mmss(g.left), 'restant')}
+        <p class="hint">${esc(it.conseils)}</p>
+        <div class="actions g-actions"><button type="button" class="btn btn--big ${g.paused ? 'btn--sheen' : 'btn--ghost'}" data-act="g-toggle">${g.paused ? (g.left < g.total ? 'Reprendre' : 'Démarrer') : 'Pause'}</button><button type="button" class="btn btn--big btn--ghost" data-act="g-cardio-done">J’ai terminé</button></div></div>`;
+    } else {
+      const st = g.steps[g.k]; const d = window.NA_EXO ? window.NA_EXO.detail(st.id, p) : { name: E[st.id].m, zones: [], load: '' };
+      const pct = (g.k / g.steps.length) * 100;
+      if (g.phase === 'rest') {
+        body = `${head(pct, g.item.title)}<div class="g-main"><p class="label">Repos</p>${ringSvg(g.left / g.restTotal, String(g.left), 'secondes')}
+          <p class="g-next"><span>Ensuite :</span> <b data-no-i18n>${esc(d.name)}</b> · <span>série ${st.set}/${st.sets}</span></p>
+          <div class="actions g-actions"><button type="button" class="btn btn--ghost" data-act="g-plus">+15 s</button><button type="button" class="btn btn--sheen" data-act="g-skip">Passer le repos</button></div></div>`;
+      } else {
+        body = `${head(pct, g.item.title)}<div class="g-main"><p class="label">Exercice ${esc(st.label)} · série ${st.set}/${st.sets}</p>
+          <h2 class="g-name" data-no-i18n>${esc(d.name)}</h2>
+          <p class="g-reps"><b>${st.reps}</b><span>répétitions</span></p><p class="g-load" data-no-i18n>${esc(d.load)}</p>
+          ${window.NA_EXO ? window.NA_EXO.bodyMap(d.zones) : ''}
+          <div class="actions g-actions"><button type="button" class="btn btn--ghost" data-exo="${st.id}">${icon('album')}Fiche</button><button type="button" class="btn btn--big btn--sheen" data-act="g-set">${icon('check')}Série faite</button></div>
+          <p class="hint">${st.rest ? `Puis ${st.rest} s de repos.` : 'Enchaîne directement avec l’exercice suivant.'}</p></div>`;
+      }
+    }
+    dlg.innerHTML = `<div class="dlg-body g-body">${body}</div>`;
+  }
+
+  function guideTick() {
+    const g = ui.guide; if (!g) { clearInterval(guideTimer); return; }
+    if (g.phase === 'cardio' && g.paused) return;
+    g.left = Math.max(0, g.left - 1);
+    const C = 2 * Math.PI * 70; const tot = g.phase === 'rest' ? g.restTotal : g.total;
+    const left = $('#g-left'); const ring = $('#g-ring');
+    if (left) left.textContent = g.phase === 'rest' ? String(g.left) : mmss(g.left);
+    if (ring) ring.setAttribute('stroke-dashoffset', (C * (1 - g.left / tot)).toFixed(1));
+    if (g.left === 0) {
+      clearInterval(guideTimer); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      if (g.phase === 'rest') { g.phase = 'work'; renderGuide(); } else finishCardio();
+    }
+  }
+  const startTimer = () => { clearInterval(guideTimer); guideTimer = setInterval(guideTick, 1000); };
+  function celebrateGuide() { if (navigator.vibrate) navigator.vibrate(300); sparks(innerWidth / 2, innerHeight / 3, 120, 0.9); }
+  function finishCardio() { const sess = cur(); const L0 = lg(sess, iso(TODAY)); L0.status = 'faite'; save(); ui.guide.phase = 'done'; clearInterval(guideTimer); renderGuide(); celebrateGuide(); }
+
   function openGive(id) {
     const sess = cur(); const st = STICKERS.find((x) => x.id === id); if (!sess || !st) return;
     const others = state.sessions.filter((x) => x.id !== sess.id);
@@ -1465,6 +1585,7 @@
     if (t.dataset.decline && sess) { const x = sess.inbox.find((y) => y.id === t.dataset.decline); if (x) { x.status = 'declined'; if (x.cloud) CLOUD.respond(x.id, 'declined').catch(() => {}); save(); render(); } return; }
     if (t.dataset.copy && sess) { const x = sess.inbox.find((y) => y.id === t.dataset.copy); if (x) { const r = await shareItem(x, sess); if (r) toast(r === 'copié' ? 'Lien copié. Envoie-le à qui tu veux.' : 'Défi partagé.'); } return; }
     if (t.dataset.give && sess) return openGive(t.dataset.give);
+    if (t.dataset.exo) return openExo(t.dataset.exo);
     if (t.dataset.faccept) { try { await CLOUD.acceptFriend(+t.dataset.faccept); toast('Ami ajouté.'); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
     if (t.dataset.fremove) { try { await CLOUD.removeFriend(+t.dataset.fremove); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
     if (t.dataset.bf && sess) { sess.profile.petitdej = t.dataset.bf; save(); render(); return refocus(`[data-bf="${t.dataset.bf}"]`); }
@@ -1561,6 +1682,24 @@
     if (a === 'checkin') return openCheckin();
     if (a === 'checkin-close') { const d = $('#checkin'); if (d) d.close(); return; }
     if (a === 'parcours') { ui.planTab = 'parcours'; return go('plan'); }
+    if (a === 'start' && sess && ui.day === todayIdx) {
+      const sv = dayView(sess, todayIdx);
+      if (!sv.rest && buildPlan(sv).byDay(todayIdx)) return openGuide();
+    }
+    if (a === 'exo-close') { const d = $('#exo'); if (d) d.close(); return; }
+    if (a === 'g-quit' || a === 'g-finish') { const d = $('#guide'); if (d) d.close(); return; }
+    if (a === 'g-set' && ui.guide) {
+      const g = ui.guide; const st = g.steps[g.k]; const L0g = lg(sess, iso(TODAY));
+      if (st.last && !L0g.ex.includes(st.id)) { L0g.ex.push(st.id); save(); }
+      g.k += 1;
+      if (g.k >= g.steps.length) { g.phase = 'done'; renderGuide(); celebrateGuide(); return; }
+      if (st.rest) { g.phase = 'rest'; g.left = st.rest; g.restTotal = st.rest; startTimer(); } else g.phase = 'work';
+      renderGuide(); return;
+    }
+    if (a === 'g-skip' && ui.guide) { clearInterval(guideTimer); ui.guide.phase = 'work'; renderGuide(); return; }
+    if (a === 'g-plus' && ui.guide) { ui.guide.left += 15; ui.guide.restTotal += 15; return; }
+    if (a === 'g-toggle' && ui.guide) { ui.guide.paused = !ui.guide.paused; if (!ui.guide.paused) startTimer(); renderGuide(); return; }
+    if (a === 'g-cardio-done' && ui.guide) { finishCardio(); return; }
     if (a === 'start') {
       const r = t.getBoundingClientRect(); sparks(r.left + r.width / 2, r.top + r.height / 2, 40, 0.5);
       const card = $('.today-grid .stack > .card'); if (!card) return;
