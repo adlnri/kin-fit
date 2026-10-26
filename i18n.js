@@ -28,6 +28,10 @@
   /* Strings added after the bulk translation (welcome, budget, regions, alternatives, patterns' words). */
   const EXTRA = {
     'Bienvenue': ['Welcome', 'Bienvenido'],
+    "page des clés de Google AI Studio": ["Google AI Studio keys page", "página de claves de Google AI Studio"],
+    "et connecte-toi avec ton compte Google (accepte les conditions la première fois).": ["and sign in with your Google account (accept the terms the first time).", "e inicia sesión con tu cuenta de Google (acepta las condiciones la primera vez)."],
+    "Ouvre la": ["Open the", "Abre la"],
+    "Touche « Create API key » (« Créer une clé API »), choisis ou crée un projet, puis copie la clé qui commence par AIza.": ["Tap “Create API key”, choose or create a project, then copy the key that starts with AIza.", "Toca «Create API key», elige o crea un proyecto y copia la clave que empieza por AIza."],
     "Voir la fiche": ["See the guide", "Ver la ficha"],
     "Fiche": ["Guide", "Ficha"],
     "Séries × répétitions": ["Sets × reps", "Series × repeticiones"],
