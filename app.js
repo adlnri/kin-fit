@@ -635,7 +635,11 @@
   function weekNo() { const d = dayDate(0); const y = new Date(d.getFullYear(), 0, 1); return Math.floor((d - y) / 6048e5); }
   function mealsFor(sess, dayI) {
     const item = buildPlan(sess).byDay(dayI);
-    return M.dayMeals(sess.profile, sess.seed, dayI, weekNo(), !!item);
+    const base = M.dayMeals(sess.profile, sess.seed, dayI, weekNo(), !!item);
+    const sw = ((sess.log[iso(dayDate(dayI))] || {}).swap) || {};
+    if (sw.dej) base.dej = M.dayMeals(sess.profile, sess.seed + sw.dej * 17, dayI, weekNo(), !!item).dej || base.dej;
+    if (sw.diner) base.diner = M.dayMeals(sess.profile, sess.seed + sw.diner * 29, dayI, weekNo(), !!item).diner || base.diner;
+    return base;
   }
 
   function mealsCard(sess, dayI) {
@@ -747,13 +751,14 @@
 
   function viewDefis(sess) {
     const w = weekList(sess);
-    const tabs = [['jour', 'Jour'], ['semaine', 'Semaine'], ['sport', 'Sport'], ['amis', 'Amis']];
+    const tabs = [['jour', 'Jour'], ['semaine', 'Semaine'], ['sport', 'Sport'], ['amis', 'Amis'], ['trophees', 'Trophées']];
     const fresh = sess.inbox.filter((x) => x.status === 'new').length;
     let body = '';
     if (ui.defisTab === 'jour') body = `<div class="defis">${dailyList(sess, todayIdx).map((c) => defiCard(c, sess)).join('')}</div>`;
     if (ui.defisTab === 'semaine') body = `<div class="defis">${w.semaine.map((c) => defiCard(c, sess)).join('')}</div>`;
     if (ui.defisTab === 'sport') body = `<div class="defis">${w.sport.map((c) => defiCard(c, sess, { big: true })).join('')}</div><p class="hint">Ajoute tes répétitions après chaque entraînement de ${esc(sportName(sess.profile))}. L’objectif s’adapte à ton niveau${/genou/i.test(sess.profile.restrictions || '') ? ' et à ton genou' : ''}.</p>`;
     if (ui.defisTab === 'amis') body = viewAmis(sess);
+    if (ui.defisTab === 'trophees') body = viewAlbum(sess).replace(/^[\s\S]*?<\/header>/, '').replace(/<p class="foot">[\s\S]*$/, '');
     return `${pendingBanner()}
       <header class="hello"><div><h1 class="h1">Défis</h1><p class="lede">Chaque défi réussi rapporte des points et des médailles pour tes trophées.</p></div>${scorebar(sess)}</header>
       <div class="tabs" role="tablist" aria-label="Catégories de défis">${tabs.map(([k, l]) => `<button type="button" role="tab" aria-selected="${ui.defisTab === k}" data-tab="${k}">${l}${k === 'amis' && fresh ? ` <span class="dot-count">${fresh}</span>` : ''}</button>`).join('')}</div>
@@ -903,6 +908,53 @@
         <section class="parcours-part"><h3 class="h3">Retour au calme · ${c.cool} min</h3>${list(c.coolList)}</section>
         <p class="hint">Bois quelques gorgées entre les tours. Si une position fait mal, passe à l’exercice suivant.</p>
       </article>${foot()}`;
+  }
+
+  /* ---------- Sport and Nutrition spaces ---------- */
+
+  const tabBar = (label, attr, cur0, list) => `<div class="tabs" role="tablist" aria-label="${label}">${list.map(([k, l]) => `<button type="button" role="tab" ${attr}="${k}" aria-selected="${cur0 === k}">${l}</button>`).join('')}</div>`;
+  const PLAN_TABS = /<div class="tabs" role="tablist" aria-label="Plan">[\s\S]*?<\/div>/;
+
+  function viewSport(sess) {
+    const t = ui.sportTab || 'programme';
+    const tabs = tabBar('Sport', 'data-stab', t, [['programme', 'Programme'], ['parcours', 'Parcours'], ['exercices', 'Exercices']]);
+    if (t === 'parcours') return viewParcours(sess, tabs);
+    if (t === 'exercices') return viewLibrary(sess, tabs);
+    ui.planTab = 'programme';
+    return viewPlan(sess).replace(PLAN_TABS, tabs);
+  }
+
+  function viewNutrition(sess) {
+    const t = ui.nutTab || 'jour';
+    const tabs = tabBar('Nutrition', 'data-ntab', t, [['jour', 'Aujourd’hui'], ['semaine', 'Semaine'], ['courses', 'Courses']]);
+    if (t === 'courses') return viewCourses(sess, tabs);
+    ui.planTab = 'nutrition';
+    const html = viewPlan(sess).replace(PLAN_TABS, tabs);
+    if (t === 'semaine') return html;
+    // Today: what you ate against what you need, then today's dishes.
+    const m = mealsFor(sess, todayIdx);
+    return html.replace(/<div class="today-grid">[\s\S]*$/, `<div class="today-grid"><div class="stack">${dayFoodCard(sess)}${breakfastCard(sess, buildPlan(dayView(sess, todayIdx)).byDay(todayIdx), lg(sess, iso(TODAY)), { full: true, readOnly: true })}</div>
+      <div class="stack"><article class="card card--nutrition"><header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Déjeuner et dîner</h2><p class="muted">${esc(M.summary(sess.profile))}</p></div></header>${dishBlock('Déjeuner', m.dej)}${dishBlock('Dîner', m.diner)}${m.snack ? `<p class="meal-snack"><span class="label">Collation</span> ${esc(m.snack.n)}</p>` : ''}</article></div></div>${foot()}`);
+  }
+
+  function dayFoodCard(sess) {
+    const p = sess.profile; const it = buildPlan(dayView(sess, todayIdx)).byDay(todayIdx); const L0 = lg(sess, iso(TODAY)); const eat = L0.eat || {};
+    const b = breakfast(p, it ? 1.08 : 0.95); const m = mealsFor(sess, todayIdx);
+    const rows = [['pdj', 'Petit-déjeuner', b.tot.k, !!L0.pdj], ['dej', 'Déjeuner', m.dej ? m.dej.k : 0, !!eat.dej], ['diner', 'Dîner', m.diner ? m.diner.k : 0, !!eat.diner], ['snack', 'Collation', Math.round(m.kcal * 0.1), !!eat.snack]];
+    const got = rows.reduce((t, r) => t + (r[3] ? r[2] : 0), 0); const C = 2 * Math.PI * 52; const f = Math.min(1, got / (m.kcal || 1));
+    return `<article class="card food-day"><header class="card-head"><span class="chip-ico">${icon('flame')}</span><div><h2 class="h2">Ta journée</h2><p class="muted">${it ? 'Jour d’entraînement' : 'Jour de repos'} · besoin estimé ${m.kcal} kcal</p></div></header>
+      <div class="food-top"><div class="hero-ring food-ring" role="img" aria-label="${got} kcal sur ${m.kcal}"><svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="food-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e3a1"/><stop offset=".45" stop-color="#d4af37"/><stop offset="1" stop-color="#8a6416"/></linearGradient></defs><circle class="ring-track" cx="60" cy="60" r="52"/><circle class="ring-val" cx="60" cy="60" r="52" stroke="url(#food-gold)" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - f)).toFixed(1)}"/></svg><p><b>${got}</b><span>sur ${m.kcal} kcal</span></p></div>
+        <ul class="food-rows">${rows.map(([k, n, kc, ok]) => `<li class="${ok ? 'is-on' : ''}"><span><b>${n}</b><small>≈ ${kc} kcal</small></span><span class="food-acts">${k === 'dej' || k === 'diner' ? `<button type="button" class="link-btn" data-swap="${k}">Autre idée</button>` : ''}<button type="button" class="btn btn--${ok ? 'done' : 'cat'}" data-eat="${k}" aria-pressed="${ok}">${ok ? icon('check') + 'Mangé' : 'J’ai mangé ça'}</button></span></li>`).join('')}</ul></div>
+    </article>`;
+  }
+
+  function viewLibrary(sess, tabs) {
+    const p = sess.profile; const z = ui.libZone || 'all'; const X = window.NA_EXO;
+    const ids = Object.keys(E).filter((id) => z === 'all' || E[id].key === z);
+    const groups = [['all', 'Tout'], ['bas', 'Bas du corps'], ['haut', 'Haut du corps'], ['tronc', 'Tronc et gainage']];
+    return `<header class="hello"><div><h1 class="h1">Exercices</h1><p class="lede">Tous les exercices de ton programme, adaptés à ton matériel. Touche-en un pour voir comment le faire et quel poids prendre.</p></div></header>${tabs}
+      <div class="seg lib-filter" role="group" aria-label="Zone du corps">${groups.map(([k, l]) => `<button type="button" data-libz="${k}" aria-pressed="${z === k}">${l}</button>`).join('')}</div>
+      <div class="lib-grid">${ids.map((id) => { const d = X ? X.detail(id, p) : { name: variant(E[id], p).n, zones: [] }; return `<button type="button" class="card lib-card" data-exo="${id}">${X ? X.bodyMap(d.zones) : ''}<b data-no-i18n>${esc(d.name)}</b><small>${esc(E[id].m)}</small></button>`; }).join('')}</div>${foot()}`;
   }
 
   function viewPlan(sess) {
@@ -1499,7 +1551,7 @@
     if (!sess && !ui.ob) ui.ob = { step: 0, p: blank(), editId: null };
     if (ui.ob) { app.classList.add('is-onboarding'); main.innerHTML = viewOnboarding(); mark('onboarding'); return; }
     app.classList.remove('is-onboarding');
-    const views = { today: viewToday, defis: viewDefis, album: viewAlbum, plan: viewPlan, coach: viewCoach, profil: viewProfil };
+    const views = { today: viewToday, defis: viewDefis, sport: viewSport, nutrition: viewNutrition, coach: viewCoach, profil: viewProfil };
     main.classList.toggle('printing', ui.printing);
     main.innerHTML = (views[ui.view] || viewToday)(sess);
     mark(ui.view);
@@ -1536,7 +1588,10 @@
 
   /* ---------- Events ---------- */
 
-  function go(view) { ui.view = view; ui.confirmDelete = false; if (view === 'defis') refreshSocial(); render(); $('#main').focus({ preventScroll: true }); window.scrollTo(0, 0); }
+  function go(view) {
+    if (view === 'plan') view = 'sport';
+    if (view === 'album') { view = 'defis'; ui.defisTab = 'trophees'; }
+    ui.view = view; ui.confirmDelete = false; if (view === 'defis') refreshSocial(); render(); $('#main').focus({ preventScroll: true }); window.scrollTo(0, 0); }
   function startOnboarding(editId) {
     const s = editId ? state.sessions.find((x) => x.id === editId) : null;
     ui.ob = { step: 0, p: s ? JSON.parse(JSON.stringify(s.profile)) : blank(), editId: editId || null };
@@ -1568,6 +1623,18 @@
     if (t.dataset.circuit) { ui.circuit = t.dataset.circuit; render(); return refocus(`[data-circuit="${ui.circuit}"]`); }
     if (t.dataset.cdur) { ui.circuitDur = +t.dataset.cdur; render(); return refocus(`[data-cdur="${ui.circuitDur}"]`); }
     if (t.dataset.dur && sess) { sess.profile.duree = +t.dataset.dur; save(); render(); return refocus(`[data-dur="${t.dataset.dur}"]`); }
+    if (t.dataset.stab) { ui.sportTab = t.dataset.stab; render(); return refocus(`[data-stab="${ui.sportTab}"]`); }
+    if (t.dataset.ntab) { ui.nutTab = t.dataset.ntab; render(); return refocus(`[data-ntab="${ui.nutTab}"]`); }
+    if (t.dataset.libz) { ui.libZone = t.dataset.libz; render(); return refocus(`[data-libz="${ui.libZone}"]`); }
+    if (t.dataset.eat && sess) {
+      const L0e = lg(sess, iso(TODAY)); const k = t.dataset.eat;
+      if (k === 'pdj') L0e.pdj = !L0e.pdj; else { L0e.eat = L0e.eat || {}; L0e.eat[k] = !L0e.eat[k]; }
+      settle(sess); render(); return refocus(`[data-eat="${k}"]`);
+    }
+    if (t.dataset.swap && sess) {
+      const L0s = lg(sess, iso(TODAY)); L0s.swap = L0s.swap || {}; L0s.swap[t.dataset.swap] = (L0s.swap[t.dataset.swap] || 0) + 1;
+      save(); render(); toast('Nouvelle idée de plat.'); return refocus(`[data-swap="${t.dataset.swap}"]`);
+    }
     if (t.dataset.ptab) { ui.planTab = t.dataset.ptab; render(); return refocus(`[data-ptab="${ui.planTab}"]`); }
     if (t.dataset.day != null) { ui.day = +t.dataset.day; render(); return refocus(`[data-day="${ui.day}"]`); }
     if (t.dataset.switch) { state.current = t.dataset.switch; save(); ui.day = todayIdx; return go('today'); }
@@ -1707,7 +1774,7 @@
     if (a === 'ai-setup') { go('profil'); const c = $$('.ai-card').find((x) => x.querySelector('input[name="aiprov"]')); if (c) c.scrollIntoView({ block: 'start' }); return; }
     if (a === 'checkin') return openCheckin();
     if (a === 'checkin-close') { const d = $('#checkin'); if (d) d.close(); return; }
-    if (a === 'parcours') { ui.planTab = 'parcours'; return go('plan'); }
+    if (a === 'parcours') { ui.sportTab = 'parcours'; return go('sport'); }
     if (a === 'start' && sess && ui.day === todayIdx) {
       const sv = dayView(sess, todayIdx);
       if (!sv.rest && buildPlan(sv).byDay(todayIdx)) return openGuide();
