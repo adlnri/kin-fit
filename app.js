@@ -13,6 +13,7 @@
   /* ---------- Icons: one 24px grid, 2px round stroke ---------- */
 
   const P = {
+    play: 'M8 5v14l11-7z', pause: 'M8 5v14M16 5v14', prev: 'M18 6l-8 6 8 6M6 6v12', next: 'M6 6l8 6-8 6M18 6v12', sound: 'M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12',
     dumbbell: 'M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12',
     heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
     bowl: 'M3 11h18a9 9 0 0 1-18 0zM9 11c0-2.5 1.5-4.5 3.5-5.5M15 7.5c.8.9 1.3 2.1 1.3 3.5',
@@ -583,6 +584,15 @@
     </article>`;
   }
 
+  // The breakfast as a dish, so it opens in the recipe sheet with today's quantities.
+  const bfDish = (sess, b) => ({ id: `bf-${sess.profile.petitdej}`, n: `Petit-déjeuner ${PDJ[sess.profile.petitdej]}`, k: b.tot.k, p: b.tot.p,
+    ing: b.items.map((it) => ({ n: FOOD[it.id].n + (it.id === 'dinde' ? b.meat : ''), q: gramsLabel(it) })) });
+  // Breakfasts validated on consecutive days, ending today or yesterday.
+  function bfStreak(sess) {
+    let n = 0; const d = new Date(TODAY); if (!sess.done[`j:pdj:${iso(d)}`]) d.setDate(d.getDate() - 1);
+    while (sess.done[`j:pdj:${iso(d)}`] && n < 365) { n += 1; d.setDate(d.getDate() - 1); }
+    return n;
+  }
   const gramsLabel = (it) => { const f = FOOD[it.id]; if (f.unit) { const n = it.g / f.unit; return `${n} ${f.un}${n > 1 ? 's' : ''} · ${it.g} g`; } return `${it.g} g`; };
 
   function breakfastCard(sess, dayItem, L0, opts = {}) {
@@ -608,7 +618,8 @@
       <p><b>Boisson :</b> ${esc(drink)}.</p>
       <p><b>Alternative rapide :</b> ${esc(quick)}</p>
       ${opts.full || !L0 ? '' : ''}${altList(M.breakfastAlts(p, b.items))}
-      ${L0 && !opts.readOnly ? `<div class="card-foot"><button type="button" class="btn btn--${L0.pdj ? 'done' : 'cat'}" data-tap="pdj" aria-pressed="${L0.pdj}">${L0.pdj ? icon('check') + 'Petit-déjeuner pris' : 'Je l’ai pris'}</button></div>` : ''}
+      ${recipeBtn(bfDish(sess, b))}
+      ${L0 && !opts.readOnly ? `<div class="card-foot bf-defi"><p><b>Défi du matin</b> · +10 points${bfStreak(sess) > 1 ? ` · ${bfStreak(sess)} matins d’affilée` : ''}</p><button type="button" class="btn btn--${L0.pdj ? 'done' : 'cat'}" data-tap="pdj" aria-pressed="${L0.pdj}">${L0.pdj ? icon('check') + 'Petit-déjeuner pris' : 'Je l’ai pris'}</button></div>` : ''}
     </article>`;
   }
 
@@ -622,7 +633,7 @@
   const recipeBtn = (d, cls = 'btn btn--glass') => {
     if (!d || d.ai || !window.NA_RECIPES || !window.NA_RECIPES.has(d.id)) return '';
     const key = `${d.id}-${d.k}`; SHOWN[key] = d;
-    return `<button type="button" class="${cls}" data-recipe="${key}">${icon('bowl')}Voir la recette</button>`;
+    return `<button type="button" class="${cls}" data-recipe="${key}">${icon('bowl')}${d.id.startsWith('bf-') ? 'Voir la préparation' : 'Voir la recette'}</button>`;
   };
 
   function openRecipe(key) {
@@ -923,7 +934,7 @@
         <p>${esc(c.why)}</p>
         <section class="parcours-part"><h3 class="h3">Échauffement · ${c.warm} min</h3>${list(c.warmList)}</section>
         <section class="parcours-part"><h3 class="h3">Le circuit · ${c.rounds} tours</h3>
-          <ol class="exs">${c.stations.map((x, i) => `<li class="ex"><span class="ex-num">${i + 1}</span><div class="ex-main">
+          <ol class="exs">${c.stations.map((x, i) => { const d = x.id && window.NA_EXO ? window.NA_EXO.detail(x.id, p, x.v) : null; return `<li class="ex ex--station">${d && d.photos ? `<button type="button" class="st-ph" data-exo="${x.id}" aria-label="Fiche : ${esc(x.n)}"><img src="${d.photos[1]}" alt="" loading="lazy" decoding="async"><span>${i + 1}</span></button>` : `<span class="ex-num">${i + 1}</span>`}<div class="ex-main">
             <h4>${esc(x.n)}</h4>
             <p class="ex-meta">${c.pace.on} s d’effort · ${c.pace.off} s de repos · ${esc(x.load)}</p>
             <p class="ex-muscle">${esc(x.m)}</p>
@@ -931,7 +942,8 @@
               <p><b>Explication.</b> ${esc(x.tech)}</p>
               <p><b>Erreur à éviter.</b> ${esc(x.err)}</p>
               <p><a href="${yt(x.q)}" target="_blank" rel="noopener">${icon('link')}Chercher « ${esc(x.q)} » sur YouTube</a></p>
-            </div></details></div></li>`).join('')}</ol></section>
+            </div></details>
+            ${x.id ? `<div class="actions ex-acts"><button type="button" class="btn btn--glass" data-video="${x.id}" data-vkit="${['gym', 'dumb', 'band', 'body'].find((k) => E[x.id][k] === x.v) || ''}">${icon('play')}Vidéo explicative</button><button type="button" class="btn btn--ghost" data-exo="${x.id}">Voir la fiche</button></div>` : ''}</div></li>`; }).join('')}</ol></section>
         <section class="parcours-part"><h3 class="h3">Retour au calme · ${c.cool} min</h3>${list(c.coolList)}</section>
         <p class="hint">Bois quelques gorgées entre les tours. Si une position fait mal, passe à l’exercice suivant.</p>
       </article>${foot()}`;
@@ -978,7 +990,7 @@
   function viewLibrary(sess, tabs) {
     const p = sess.profile; const z = ui.libZone || 'all'; const X = window.NA_EXO;
     const ids = Object.keys(E).filter((id) => z === 'all' || E[id].key === z);
-    const groups = [['all', 'Tout'], ['bas', 'Bas du corps'], ['haut', 'Haut du corps'], ['tronc', 'Tronc et gainage']];
+    const groups = [['all', 'Tout'], ['bas', 'Bas du corps'], ['haut', 'Haut du corps'], ['tronc', 'Tronc et gainage'], ['cardio', 'Cardio'], ['mobilite', 'Mobilité']];
     return `<header class="hello"><div><h1 class="h1">Exercices</h1><p class="lede">Tous les exercices de ton programme, adaptés à ton matériel. Touche-en un pour voir comment le faire et quel poids prendre.</p></div></header>${tabs}
       <div class="seg lib-filter" role="group" aria-label="Zone du corps">${groups.map(([k, l]) => `<button type="button" data-libz="${k}" aria-pressed="${z === k}">${l}</button>`).join('')}</div>
       <div class="lib-grid">${ids.map((id) => { const d = X ? X.detail(id, p) : { name: variant(E[id], p).n, zones: [] }; return `<button type="button" class="card lib-card" data-exo="${id}">${X ? (d.photos ? `<img class="lib-ph" src="${d.photos[1]}" alt="" loading="lazy" decoding="async">` : X.bodyMap(d.zones)) : ''}<b data-no-i18n>${esc(d.name)}</b><small>${esc(E[id].m)}</small></button>`; }).join('')}</div>${foot()}`;
@@ -1306,6 +1318,7 @@
     dlg.innerHTML = `<div class="dlg-body">
       <header class="dlg-head"><div><h2 class="h2" id="exo-title" data-no-i18n>${esc(d.name)}</h2><p class="muted">${esc(d.muscles)}</p></div><button type="button" class="round" data-act="exo-close" aria-label="Fermer">${icon('x')}</button></header>
       ${window.NA_EXO.anim(d)}
+      <button type="button" class="btn btn--big btn--sheen exo-video" data-video="${id}">${icon('play')}Vidéo explicative</button>
       ${d.photos ? window.NA_EXO.bodyMap(d.zones) : ''}
       <dl class="facts exo-facts"><div><dt>Séries × répétitions</dt><dd>${sr.txt}</dd></div><div><dt>Repos</dt><dd>${d.rest} s</dd></div><div><dt>Charge</dt><dd data-no-i18n>${esc(d.load)}</dd></div></dl>
       <section class="exo-part"><h3 class="h3">Quel poids prendre ?</h3><p data-no-i18n>${esc(d.tip)}</p></section>
@@ -1318,6 +1331,62 @@
     document.body.appendChild(dlg);
     dlg.addEventListener('close', () => dlg.remove());
     dlg.showModal();
+  }
+
+  /* ---------- Explainer video: the photos in motion, captions and a voice, built from the exercise sheet ---------- */
+
+  const VOICE = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES' };
+  const VLAB = {
+    fr: { step: 'Étape', breath: 'Respiration et posture', err: 'Erreur à éviter', easy: 'Plus facile', hard: 'Plus dur' },
+    en: { step: 'Step', breath: 'Breathing and posture', err: 'Mistake to avoid', easy: 'Easier', hard: 'Harder' },
+    es: { step: 'Paso', breath: 'Respiración y postura', err: 'Error que evitar', easy: 'Más fácil', hard: 'Más difícil' },
+  };
+  let vid = null;
+
+  function openVideo(id, kit) {
+    const sess = cur(); if (!sess || !window.NA_EXO || !E[id]) return;
+    const old = $('#video'); if (old) old.close();
+    const p = dayView(sess, todayIdx).profile || sess.profile; const d = window.NA_EXO.detail(id, p, (kit && E[id][kit]) || undefined);
+    const lang = ['en', 'es'].includes(window.NA_I18N.lang) ? window.NA_I18N.lang : 'fr'; const T = VLAB[lang];
+    const scenes = [{ k: d.name, t: d.muscles }, ...d.steps.map((s, i) => ({ k: `${T.step} ${i + 1}`, t: s })),
+      { k: T.breath, t: d.tech }, { k: T.err, t: d.err }, { k: T.easy, t: d.easy }, { k: T.hard, t: d.hard }].filter((s) => s.t);
+    const dlg = document.createElement('dialog'); dlg.id = 'video'; dlg.className = 'dlg dlg--full vid'; dlg.setAttribute('aria-labelledby', 'vid-title');
+    dlg.innerHTML = `<div class="dlg-body vid-body">
+      <header class="dlg-head"><div><p class="label">Vidéo explicative</p><h2 class="h2" id="vid-title" data-no-i18n>${esc(d.name)}</h2></div><button type="button" class="round" data-act="video-close" aria-label="Fermer">${icon('x')}</button></header>
+      <div class="vid-stage">${window.NA_EXO.anim(d)}<div class="vid-cap" aria-live="polite" data-no-i18n><b id="vid-k"></b><p id="vid-t"></p></div></div>
+      <div class="vid-bar" aria-hidden="true">${scenes.map(() => '<i><b></b></i>').join('')}</div>
+      <div class="vid-ctl"><button type="button" class="round" data-act="video-prev" aria-label="Précédent">${icon('prev')}</button><button type="button" class="round vid-play" data-act="video-toggle" aria-label="Pause">${icon('pause')}</button><button type="button" class="round" data-act="video-next" aria-label="Suivant">${icon('next')}</button><button type="button" class="round" data-act="video-sound" aria-pressed="true" aria-label="Voix">${icon('sound')}</button></div>
+    </div>`;
+    vid = { scenes, i: 0, playing: true, voice: !!window.speechSynthesis, timer: 0, tok: 0, dlg, lang };
+    dlg.addEventListener('close', () => { stopVid(); dlg.remove(); vid = null; });
+    document.body.appendChild(dlg); dlg.showModal(); playScene(0);
+  }
+
+  function stopVid() { if (!vid) return; vid.tok += 1; clearTimeout(vid.timer); if (window.speechSynthesis) window.speechSynthesis.cancel(); }
+
+  function syncVid() {
+    if (!vid) return; const b = vid.dlg.querySelector('.vid-play'); const end = !vid.playing && vid.i === vid.scenes.length - 1;
+    b.innerHTML = icon(vid.playing ? 'pause' : 'play'); b.setAttribute('aria-label', vid.playing ? 'Pause' : end ? 'Revoir' : 'Lecture');
+    vid.dlg.querySelector('[data-act="video-sound"]').setAttribute('aria-pressed', String(vid.voice));
+  }
+
+  // One scene: caption, progress, and the voice (or a reading-time timer), then the next scene.
+  function playScene(i) {
+    if (!vid) return; stopVid(); vid.i = Math.max(0, Math.min(i, vid.scenes.length - 1));
+    const s = vid.scenes[vid.i]; const dlg = vid.dlg; const tok = vid.tok;
+    dlg.querySelector('#vid-k').textContent = s.k; dlg.querySelector('#vid-t').textContent = s.t;
+    const ms = Math.max(3500, s.t.split(/\s+/).length * 400 + 1200);
+    dlg.querySelectorAll('.vid-bar i').forEach((el, j) => { el.className = j < vid.i ? 'is-done' : j === vid.i ? 'is-now' : ''; el.firstChild.style.animationDuration = `${ms}ms`; el.firstChild.style.animationPlayState = vid.playing ? 'running' : 'paused'; });
+    syncVid(); if (!vid.playing) return;
+    const next = () => {
+      if (!vid || vid.tok !== tok) return;
+      if (vid.i < vid.scenes.length - 1) vid.timer = setTimeout(() => playScene(vid.i + 1), 500); else { vid.playing = false; syncVid(); }
+    };
+    if (vid.voice && window.SpeechSynthesisUtterance) {
+      const u = new SpeechSynthesisUtterance(`${s.k}. ${s.t}`); u.lang = VOICE[vid.lang]; u.rate = 0.95;
+      u.onend = next; u.onerror = next; window.speechSynthesis.speak(u);
+      vid.timer = setTimeout(next, ms + 8000); // in case the voice never reports its end
+    } else vid.timer = setTimeout(next, ms);
   }
 
   /* ---------- Guided session ---------- */
@@ -1389,7 +1458,7 @@
           <h2 class="g-name" data-no-i18n>${esc(d.name)}</h2>
           <p class="g-reps"><b>${st.reps}</b><span>répétitions</span></p><p class="g-load" data-no-i18n>${esc(d.load)}</p>
           ${window.NA_EXO ? window.NA_EXO.anim(d, true) : ''}
-          <div class="actions g-actions"><button type="button" class="btn btn--ghost" data-exo="${st.id}">${icon('album')}Fiche</button><button type="button" class="btn btn--big btn--sheen" data-act="g-set">${icon('check')}Série faite</button></div>
+          <div class="actions g-actions"><button type="button" class="btn btn--ghost" data-video="${st.id}">${icon('play')}Vidéo</button><button type="button" class="btn btn--ghost" data-exo="${st.id}">${icon('album')}Fiche</button><button type="button" class="btn btn--big btn--sheen" data-act="g-set">${icon('check')}Série faite</button></div>
           <p class="hint">${st.rest ? `Puis ${st.rest} s de repos.` : 'Enchaîne directement avec l’exercice suivant.'}</p></div>`;
       }
     }
@@ -1545,10 +1614,22 @@
     return '';
   }
 
+  // After the questionnaire: offer the free account that keeps the profile safe; it can be skipped.
+  function viewSave(sess) {
+    return `<div class="save-step">
+      <p class="label">Dernière étape · facultative</p>
+      <h1 class="h1" id="save-title" tabindex="-1">Sauvegarde ton profil, ${esc(sess.profile.prenom)}</h1>
+      <ul class="save-perks"><li>${icon('check')}Ton programme et ta progression en sécurité, même si tu changes de téléphone</li><li>${icon('check')}Des défis avec tes amis, où qu’ils soient</li><li>${icon('check')}Gratuit, sans mot de passe : un lien par e-mail suffit</li></ul>
+      ${accountCard(sess)}
+      <button type="button" class="btn btn--ghost save-later" data-act="save-later">Plus tard</button>
+      <p class="hint">Tu pourras créer ton compte à tout moment dans Profil.</p>
+    </div>`;
+  }
+
   function finishOnboarding() {
     const o = ui.ob; let sess;
     if (o.editId) { sess = state.sessions.find((x) => x.id === o.editId); sess.profile = o.p; sess.seed += 1; sess.ai = {}; }
-    else { sess = migrate({ id: `s${Date.now()}`, seed: 0, profile: o.p }); state.sessions.push(sess); }
+    else { sess = migrate({ id: `s${Date.now()}`, seed: 0, profile: o.p }); state.sessions.push(sess); if (CLOUD.enabled && !CLOUD.linked) sess.askSave = true; }
     state.current = sess.id; ui.ob = null; ui.view = 'today'; ui.day = todayIdx;
     save();
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1578,6 +1659,8 @@
     if (!window.NA_I18N.prefs.country) { app.classList.add('is-onboarding'); main.innerHTML = viewWelcome(); mark('welcome'); return; }
     if (!sess && !ui.ob) ui.ob = { step: 0, p: blank(), editId: null };
     if (ui.ob) { app.classList.add('is-onboarding'); main.innerHTML = viewOnboarding(); mark('onboarding'); return; }
+    if (sess && sess.askSave && CLOUD.linked) delete sess.askSave;
+    if (sess && sess.askSave && CLOUD.enabled) { app.classList.add('is-onboarding'); main.innerHTML = viewSave(sess); mark('save'); return; }
     app.classList.remove('is-onboarding');
     const views = { today: viewToday, defis: viewDefis, sport: viewSport, nutrition: viewNutrition, coach: viewCoach, profil: viewProfil };
     main.classList.toggle('printing', ui.printing);
@@ -1699,6 +1782,7 @@
     if (t.dataset.give && sess) return openGive(t.dataset.give);
     if (t.dataset.exo) return openExo(t.dataset.exo);
     if (t.dataset.recipe) return openRecipe(t.dataset.recipe);
+    if (t.dataset.video) return openVideo(t.dataset.video, t.dataset.vkit);
     if (t.dataset.rstep) { const on = t.getAttribute('aria-pressed') !== 'true'; t.setAttribute('aria-pressed', String(on)); if (on && navigator.vibrate) navigator.vibrate(15); return; }
     if (t.dataset.faccept) { try { await CLOUD.acceptFriend(+t.dataset.faccept); toast('Ami ajouté.'); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
     if (t.dataset.fremove) { try { await CLOUD.removeFriend(+t.dataset.fremove); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
@@ -1809,7 +1893,13 @@
       const sv = dayView(sess, todayIdx);
       if (!sv.rest && buildPlan(sv).byDay(todayIdx)) return openGuide();
     }
+    if (a === 'save-later') { const s = cur(); if (s) { delete s.askSave; save(); } render(); window.scrollTo(0, 0); return; }
     if (a === 'exo-close') { const d = $('#exo'); if (d) d.close(); return; }
+    if (a === 'video-close') { const d = $('#video'); if (d) d.close(); return; }
+    if (a === 'video-prev' && vid) return playScene(vid.i - 1);
+    if (a === 'video-next' && vid) return playScene(vid.i + 1);
+    if (a === 'video-toggle' && vid) { const end = !vid.playing && vid.i === vid.scenes.length - 1; vid.playing = !vid.playing; if (vid.playing) playScene(end ? 0 : vid.i); else { stopVid(); playScene(vid.i); } return; }
+    if (a === 'video-sound' && vid) { vid.voice = !vid.voice && !!window.speechSynthesis; playScene(vid.i); return; }
     if (a === 'recipe-close') { const d = $('#recipe'); if (d) d.close(); return; }
     if (a === 'g-quit' || a === 'g-finish') { const d = $('#guide'); if (d) d.close(); return; }
     if (a === 'g-set' && ui.guide) {

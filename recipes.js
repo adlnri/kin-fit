@@ -144,6 +144,25 @@
       prep: TREAT },
   };
 
+  // Breakfasts name swapped foods by role too (eggs or their alternative), since meals.js adapts them to the diet.
+  Object.assign(R, {
+    'bf-sale': { min: 10,
+      fr: ['Fais cuire les œufs (ou leur alternative : tofu émietté, pois chiches) : brouillés 3 min à feu doux, au plat 4 min, ou durs 9 min.', 'Fais griller le pain.', 'Écrase l’avocat (ou son alternative) avec un trait de citron, du sel et du poivre, puis tartine.', 'Ajoute la dinde (ou son alternative) et les œufs par-dessus.', 'Sers avec les tomates cerises coupées en deux et ta boisson.'],
+      en: ['Cook the eggs (or their alternative: crumbled tofu, chickpeas): scrambled 3 min over low heat, fried 4 min, or hard-boiled 9 min.', 'Toast the bread.', 'Mash the avocado (or its alternative) with a squeeze of lemon, salt and pepper, then spread.', 'Top with the turkey (or its alternative) and the eggs.', 'Serve with the halved cherry tomatoes and your drink.'],
+      es: ['Cocina los huevos (o su alternativa: tofu desmenuzado, garbanzos): revueltos 3 min a fuego suave, a la plancha 4 min o duros 9 min.', 'Tuesta el pan.', 'Aplasta el aguacate (o su alternativa) con limón, sal y pimienta y úntalo.', 'Añade el pavo (o su alternativa) y los huevos encima.', 'Sirve con los tomates cherry partidos y tu bebida.'],
+      prep: { fr: 'Prépare des œufs durs la veille : 3 minutes le matin suffisent.', en: 'Hard-boil eggs the night before: 3 minutes in the morning is enough.', es: 'Cuece huevos la víspera: por la mañana bastan 3 minutos.' } },
+    'bf-sucre': { min: 8,
+      fr: ['Fais chauffer les flocons 3 min avec deux fois leur volume d’eau ou de lait, ou mange-les crus, trempés la veille.', 'Verse dans un bol et ajoute le skyr (ou son alternative végétale).', 'Coupe la banane en rondelles.', 'Ajoute les fruits rouges et les amandes concassées (ou les graines).', 'Arrose de miel (ou de sirop d’érable) et mange tout de suite.'],
+      en: ['Heat the oats 3 min with twice their volume of water or milk, or eat them raw, soaked overnight.', 'Pour into a bowl and add the skyr (or its plant alternative).', 'Slice the banana.', 'Add the berries and the chopped almonds (or seeds).', 'Drizzle with honey (or maple syrup) and eat straight away.'],
+      es: ['Calienta los copos 3 min con el doble de su volumen de agua o leche, o cómelos crudos, remojados la víspera.', 'Vierte en un bol y añade el skyr (o su alternativa vegetal).', 'Corta el plátano en rodajas.', 'Añade los frutos rojos y las almendras picadas (o las semillas).', 'Riega con miel (o sirope de arce) y cómelo enseguida.'],
+      prep: { fr: 'Version overnight oats : tout dans un bocal la veille, au frigo.', en: 'Overnight oats version: everything in a jar the night before, in the fridge.', es: 'Versión overnight oats: todo en un tarro la víspera, en la nevera.' } },
+    'bf-mixte': { min: 10,
+      fr: ['Fais cuire les œufs (ou leur alternative) : brouillés 3 min ou durs 9 min.', 'Fais griller le pain et tartine le fromage frais (ou son alternative).', 'Pose les œufs dessus, avec sel, poivre et ciboulette.', 'Coupe la pomme en lamelles, tartine-les de beurre de cacahuète (ou de graines) et d’un filet de miel.', 'Commence par la partie salée, finis par la pomme.'],
+      en: ['Cook the eggs (or their alternative): scrambled 3 min or hard-boiled 9 min.', 'Toast the bread and spread the cream cheese (or its alternative).', 'Lay the eggs on top with salt, pepper and chives.', 'Slice the apple and spread the slices with peanut butter (or seed butter) and a little honey.', 'Start with the savoury part and finish with the apple.'],
+      es: ['Cocina los huevos (o su alternativa): revueltos 3 min o duros 9 min.', 'Tuesta el pan y unta el queso fresco (o su alternativa).', 'Pon los huevos encima con sal, pimienta y cebollino.', 'Corta la manzana en láminas y úntalas con crema de cacahuete (o de semillas) y un poco de miel.', 'Empieza por lo salado y termina con la manzana.'],
+      prep: { fr: 'Tout se prépare en 10 minutes, ou la veille pour les œufs durs.', en: 'Ready in 10 minutes, or the night before for hard-boiled eggs.', es: 'Listo en 10 minutos, o la víspera para los huevos duros.' } },
+  });
+
   function get(id) {
     const r = R[id]; if (!r) return null; const l = L();
     return { min: r.min, steps: r[l] || r.fr, prep: r.prep ? r.prep[l] || r.prep.fr : '' };

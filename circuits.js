@@ -19,13 +19,16 @@
 
   // Stations per circuit: engine exercises (id) or cardio moves (move).
   const TYPES = {
-    corps: { name: 'Poids du corps', icon: 'stretch', kit: 'corps', met: 7, stations: [{ id: 'squat' }, { id: 'bench' }, { id: 'fente' }, { id: 'row' }, { id: 'hip' }, { id: 'ohp' }, { id: 'planche' }, { id: 'deadbug' }],
+    corps: { name: 'Poids du corps', icon: 'stretch', kit: 'corps', met: 7, stations: [{ id: 'squat' }, { id: 'bench' }, { id: 'fente_av' }, { id: 'row' }, { id: 'pont' }, { id: 'dips' }, { id: 'planche' }, { move: 'climber' }],
       why: 'Un parcours sans matériel qui alterne jambes, poussée, tirage et gainage : chaque groupe récupère pendant que le suivant travaille.' },
     cardio: { name: 'Cardio', icon: 'heart', kit: 'corps', met: 8, stations: [{ move: 'jacks' }, { move: 'genoux' }, { move: 'burpee' }, { move: 'climber' }, { move: 'patineur' }, { move: 'corde' }, { move: 'shadow' }, { move: 'sprint' }],
       why: 'Des efforts courts et intenses qui font monter le cœur, puis une récupération incomplète : idéal pour l’endurance et la dépense calorique.' },
     halteres: { name: 'Haltères', icon: 'dumbbell', kit: 'halteres', met: 7.5, stations: [{ id: 'squat' }, { id: 'bench' }, { id: 'row' }, { id: 'fente' }, { id: 'ohp' }, { id: 'rdl' }, { id: 'thruster' }, { id: 'farmer' }],
       why: 'Une paire d’haltères suffit : mouvements polyarticulaires enchaînés pour la force et le cardio en même temps.' },
   };
+
+  TYPES.mobilite = { name: 'Mobilité', icon: 'stretch', kit: 'corps', met: 2.5, stations: [{ id: 'chat' }, { id: 'worlds' }, { id: 'psoas' }, { id: 'ischio' }, { id: 'pont' }, { id: 'superman' }, { id: 'enfant' }, { id: 'deadbug' }],
+    why: 'Des positions tenues et des mouvements lents pour délier hanches, dos et épaules : parfait les jours de repos ou après une séance.' };
 
   const WARM = ['Rotations des épaules et des hanches, 1 min', 'Marche puis trot sur place, 2 min', 'Squats et fentes lents à vide, 1 min', 'Montées de genoux légères, 1 min'];
   const COOL = ['Marche lente et respiration nasale, 2 min', 'Étirement des quadriceps et ischio-jambiers, 1 min', 'Étirement des pectoraux et du dos, 1 min', 'Respiration ventrale allongé, 1 min'];
@@ -35,11 +38,12 @@
     const knee = /genou/i.test(p.restrictions || '');
     if (st.move) {
       const mv = MOVES[st.move]; const name = knee ? mv.low : mv.n;
-      return { n: name, m: mv.m, load: knee ? 'Sans impact' : 'Rythme soutenu', tech: mv.tech, err: mv.err, q: `${name} technique` };
+      const ex = NA.E[st.move];
+      return { id: ex ? st.move : null, v: ex ? { n: name, txt: ex.body.txt } : null, n: name, m: mv.m, load: knee ? 'Sans impact' : 'Rythme soutenu', tech: mv.tech, err: mv.err, q: `${name} technique` };
     }
     const ex = NA.E[st.id];
     const v = kit === 'halteres' ? (ex.dumb || ex.body) : (ex.body || ex.band || ex.dumb);
-    return { n: v.n, m: ex.m, load: NA.loadText(v, p), tech: ex.tech, err: ex.err, q: `${v.n} technique` };
+    return { id: st.id, v, n: v.n, m: ex.m, load: NA.loadText(v, p), tech: ex.tech, err: ex.err, q: `${v.n} technique` };
   }
 
   function build(p, type, dur) {
