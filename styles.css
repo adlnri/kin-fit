@@ -987,3 +987,10 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 .meal-shot { width: 100%; max-height: 300px; object-fit: cover; border-radius: 16px; }
 .meal-body { display: grid; gap: 12px; }
 .meal-slots { flex-wrap: wrap; }
+
+/* ---------- OMAD ---------- */
+.omad-status { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(212, 175, 55, .35); background: rgba(212, 175, 55, .08); color: var(--gold-2, #f3dc8c); font-weight: 600; }
+.omad-stop { border-left: 3px solid #c9772f; }
+.omad-checks { gap: 10px; }
+.omad-checks .check { display: flex; gap: 10px; align-items: flex-start; line-height: 1.4; cursor: pointer; }
+.omad-checks .check input { margin-top: 3px; width: 18px; height: 18px; accent-color: #d4af37; flex: none; }

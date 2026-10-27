@@ -17,6 +17,7 @@
     dumbbell: 'M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12',
     heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
     bowl: 'M3 11h18a9 9 0 0 1-18 0zM9 11c0-2.5 1.5-4.5 3.5-5.5M15 7.5c.8.9 1.3 2.1 1.3 3.5',
+    clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
     drop: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z',
     flame: 'M12 21c-3.9 0-7-2.7-7-6.5 0-3.5 3-5.5 4-9 2 1.5 3 3.5 3 5.5 1-1 1.5-2 1.5-3.5 2.5 2 5.5 4.5 5.5 7 0 3.8-3.1 6.5-7 6.5z',
     trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6',
@@ -175,7 +176,7 @@
     if (it && it.kind === 'muscu') out.push({ key: doneKey(it, d), cat: 'sport', icon: 'dumbbell', pts: 30, title: 'Termine ta séance', desc: it.short, progress: Math.min(L0.ex.length, it.ex.length), target: it.ex.length, unit: 'exercices', mode: 'auto', hint: 'Coche chaque exercice dans Aujourd’hui.' });
     else if (it) out.push({ key: doneKey(it, d), cat: 'cardio', icon: 'heart', pts: 30, title: 'Boucle ton cardio', desc: it.type, progress: L0.status === 'faite' ? 1 : 0, target: 1, unit: '', mode: 'tap', act: 'cardio', label: 'Cardio terminé' });
     else out.push({ key: `j:mob:${d}`, cat: 'sport', icon: 'stretch', pts: 15, title: '10 minutes de mobilité', desc: 'Jour de repos actif', progress: L0.mob ? 1 : 0, target: 1, unit: '', mode: 'tap', act: 'mob', label: 'Mobilité faite' });
-    out.push({ key: `j:pdj:${d}`, cat: 'nutrition', icon: 'bowl', pts: 10, title: `Petit-déjeuner ${PDJ[p.petitdej]}`, desc: 'Celui de ton plan, ou son alternative rapide', progress: L0.pdj ? 1 : 0, target: 1, unit: '', mode: 'tap', act: 'pdj', label: 'Je l’ai pris' });
+    out.push({ key: `j:pdj:${d}`, cat: 'nutrition', icon: 'bowl', pts: 10, title: omadOn(sess) ? 'Repas OMAD' : `Petit-déjeuner ${PDJ[p.petitdej]}`, desc: omadOn(sess) ? 'Ton repas unique, dans ta fenêtre' : 'Celui de ton plan, ou son alternative rapide', progress: L0.pdj ? 1 : 0, target: 1, unit: '', mode: 'tap', act: 'pdj', label: 'Je l’ai pris' });
     out.push({ key: `j:eau:${d}`, cat: 'eau', icon: 'drop', pts: 15, title: 'Bois 2 litres d’eau', desc: '8 verres de 25 cl dans la journée', progress: L0.eau, target: 8, unit: 'verres', mode: 'water' });
     return out;
   }
@@ -604,6 +605,7 @@
   const gramsLabel = (it) => { const f = FOOD[it.id]; if (f.unit) { const n = it.g / f.unit; return `${n} ${f.un}${n > 1 ? 's' : ''} · ${it.g} g`; } return `${it.g} g`; };
 
   function breakfastCard(sess, dayItem, L0, opts = {}) {
+    if (omadOn(sess)) return omadCard(sess, dayItem, L0, opts);
     const p = sess.profile;
     const training = dayItem && (!L0 || L0.status !== 'manquee');
     const b = breakfast(p, training ? 1.08 : 0.95);
@@ -688,7 +690,86 @@
     return base;
   }
 
+  /* ---------- OMAD (one meal a day), adults in good health only ---------- */
+
+  function omadBlocks(p) {
+    const r = [];
+    if (+p.age < 18) r.push('Le mode OMAD est réservé aux adultes : avant 18 ans, le corps a besoin de repas réguliers pour grandir.');
+    if (p.poids / ((p.taille / 100) ** 2) < 18.5) r.push('Ton IMC est sous 18,5 : sauter des repas te ferait perdre du muscle et de l’énergie. Garde tes trois repas.');
+    if (p.objectif === 'masse') r.push('Ton objectif est la prise de masse : il est très difficile de manger assez en un seul repas. Garde tes trois repas.');
+    return r;
+  }
+  const omadOn = (sess) => !!(sess && sess.profile.omad && sess.profile.omad.on && !omadBlocks(sess.profile).length);
+  function omadFor(sess, dayI) {
+    const sw = ((sess.log[iso(dayDate(dayI))] || {}).swap) || {};
+    return M.omadMeal(sess.profile, sess.seed + (sw.diner || 0) * 29, dayI, weekNo(), !!buildPlan(sess).byDay(dayI));
+  }
+  const omadMin = (p) => { const [h, m] = String((p.omad && p.omad.at) || '19:00').split(':').map(Number); return h * 60 + (m || 0); };
+  const hhmm = (n) => `${String(Math.floor(n / 60) % 24).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+  const omadWindow = (p) => `${hhmm(omadMin(p))} – ${hhmm(omadMin(p) + 60)}`;
+  function omadStatus(p) {
+    const now = new Date(); const cur0 = now.getHours() * 60 + now.getMinutes(); const s = omadMin(p);
+    if (cur0 >= s && cur0 < s + 60) return 'C’est ta fenêtre repas : prends le temps de manger.';
+    const until = (s - cur0 + 1440) % 1440;
+    return `Prochain repas dans ${Math.floor(until / 60)} h ${String(until % 60).padStart(2, '0')}.`;
+  }
+
+  function omadCard(sess, dayItem, L0, opts = {}) {
+    const p = sess.profile; const dayI = ui.view === 'today' ? ui.day : todayIdx; const o = omadFor(sess, dayI);
+    return `<article class="card card--nutrition omad">
+      <header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Ton repas unique</h2><p class="muted">Mode OMAD · fenêtre ${omadWindow(p)}</p></div></header>
+      ${dayI === todayIdx ? `<p class="omad-status">${omadStatus(p)}</p>` : ''}
+      <dl class="macros">
+        <div class="m-k"><dt>Calories</dt><dd>${o.tot.k}<small> kcal</small></dd></div>
+        <div class="m-p"><dt>Protéines</dt><dd>${o.tot.p}<small> g</small></dd></div>
+        <div class="m-g"><dt>Glucides</dt><dd>${o.tot.g}<small> g</small></dd></div>
+        <div class="m-l"><dt>Lipides</dt><dd>${o.tot.l}<small> g</small></dd></div>
+      </dl>
+      ${dishBlock('Plat principal', o.main)}
+      ${o.sides.length ? `<h3 class="h3">Pour compléter</h3><ul class="ingr">${o.sides.map((s) => `<li><span>${esc(s.n)}</span><b>${s.k} kcal</b></li>`).join('')}</ul>` : ''}
+      <p class="hint">Commence par l’entrée et la protéine, finis par le fruit. Si c’est trop pour un seul repas, mange à ta faim sans te forcer.</p>
+      ${dayItem ? '<p class="note">Jour d’entraînement : place ta séance 1 à 3 heures avant ton repas. Si tu as la tête qui tourne ou que tu te sens faible, prends une collation protéinée : ce n’est pas un échec.</p>' : ''}
+      <p><b>Pendant le jeûne :</b> eau, thé ou café sans sucre, et une pincée de sel dans l’eau si tu transpires beaucoup.</p>
+      <p class="note omad-stop">Arrête le mode OMAD et parles-en à un médecin en cas de vertiges, de malaise, de palpitations, de règles qui s’arrêtent ou de pensées obsédantes autour de la nourriture.</p>
+      <div class="actions">${dayI === todayIdx ? '<button type="button" class="link-btn" data-swap="diner">Autre idée</button>' : ''}<button type="button" class="btn btn--ghost" data-act="omad-open">Réglages OMAD</button></div>
+      ${L0 && !opts.readOnly ? `<div class="card-foot bf-defi"><p><b>Défi du repas</b> · +10 points</p><button type="button" class="btn btn--${L0.pdj ? 'done' : 'cat'}" data-tap="pdj" aria-pressed="${L0.pdj}">${L0.pdj ? icon('check') + 'Repas pris' : 'Je l’ai pris'}</button></div>` : ''}
+    </article>`;
+  }
+
+  function omadPromo(sess) {
+    if (omadOn(sess)) return '';
+    return `<article class="card omad-promo"><header class="card-head"><span class="chip-ico">${icon('clock')}</span><div><h2 class="h2">Mode OMAD</h2><p class="muted">Un seul repas par jour</p></div></header>
+      <p>Tout ton besoin du jour dans un repas complet, pris dans une fenêtre d’une heure. Réservé aux adultes en bonne santé, avec des garde-fous.</p>
+      <div class="actions"><button type="button" class="btn btn--ghost" data-act="omad-open">Découvrir le mode OMAD</button></div></article>`;
+  }
+
+  function openOmad() {
+    const sess = cur(); if (!sess) return; const p = sess.profile; const on = omadOn(sess); const blocks = omadBlocks(p);
+    const old = $('#omad'); if (old) old.remove();
+    const at = (p.omad && p.omad.at) || '19:00';
+    const hours = ['12:00', '13:00', '14:00', '17:00', '18:00', '19:00', '20:00'];
+    const checks = ['J’ai 18 ans ou plus.', ...(p.sexe === 'femme' ? ['Je ne suis pas enceinte et je n’allaite pas.'] : []),
+      'Je n’ai pas de diabète et je ne prends pas de traitement qui agit sur la glycémie.',
+      'Je n’ai jamais eu de trouble du comportement alimentaire (anorexie, boulimie, hyperphagie).',
+      'Je n’ai pas de maladie chronique (cœur, reins, foie, tension), ou mon médecin est d’accord.',
+      'J’arrêterai en cas de vertiges, de malaise ou de fatigue inhabituelle.'];
+    const dlg = document.createElement('dialog'); dlg.id = 'omad'; dlg.className = 'dlg dlg--sheet'; dlg.setAttribute('aria-labelledby', 'omad-title');
+    dlg.innerHTML = `<form method="dialog" id="omad-form" class="dlg-body" novalidate>
+      <header class="dlg-head"><h2 class="h2" id="omad-title">Mode OMAD : un repas par jour</h2><button type="button" class="round" data-act="omad-close" aria-label="Fermer">${icon('x')}</button></header>
+      <p class="hint">Le principe : un seul repas complet par jour, dans une fenêtre d’une heure, et un jeûne le reste du temps. Cela peut aider à manger moins sans compter, mais ce n’est pas plus efficace que trois repas équilibrés, et ça ne convient pas à tout le monde.</p>
+      ${blocks.length ? `<div class="note omad-stop">${blocks.map((x) => `<p>${x}</p>`).join('')}</div><div class="dlg-actions">${p.omad && p.omad.on ? '<button type="button" class="btn btn--ghost" data-act="omad-off">Désactiver le mode OMAD</button>' : ''}<button type="button" class="btn" data-act="omad-close">Compris</button></div>` : `
+      ${on ? '' : `<fieldset><legend>Avant de commencer, vérifie que tout est vrai pour toi</legend><div class="stack omad-checks">${checks.map((c) => `<label class="check"><input type="checkbox" name="ok" value="1"><span>${c}</span></label>`).join('')}</div></fieldset>`}
+      <fieldset><legend>Heure de ton repas</legend><div class="choices">${hours.map((h) => radio('at', h, h, at)).join('')}</div><p class="hint">Ta fenêtre repas dure une heure. Les jours d’entraînement, place ta séance avant le repas.</p></fieldset>
+      <p class="form-error" id="omad-error" role="alert"></p>
+      <div class="dlg-actions"><button type="submit" class="btn btn--big btn--sheen">${on ? 'Enregistrer' : 'Activer le mode OMAD'}</button>${on ? '<button type="button" class="btn btn--ghost" data-act="omad-off">Désactiver</button>' : ''}</div>`}
+    </form>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener('close', () => dlg.remove());
+    dlg.showModal();
+  }
+
   function mealsCard(sess, dayI) {
+    if (omadOn(sess)) return '';
     const m = mealsFor(sess, dayI);
     return `<article class="card card--nutrition">
       <header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Déjeuner et dîner</h2><p class="muted">${esc(M.summary(sess.profile))}</p></div></header>
@@ -865,7 +946,7 @@
 
   function profileFacts(p, nutrition) {
     const rows = [['Sexe', p.sexe === 'femme' ? 'Femme' : 'Homme'], ['Âge', `${p.age} ans`], ['Taille', `${p.taille} cm`], ['Poids', `${p.poids} kg`], ['Objectif', OBJECTIFS[p.objectif]], [nutrition ? 'Sport principal' : 'Sports', nutrition ? sportName(p) : sportList(p)]];
-    if (nutrition) rows.push(['Niveau d’activité', activity(p).label], ['Régime', M.REGIMES[p.regime || 'omni']], ['Pratiques', (p.pratiques || []).map((x) => M.PRATIQUES[x]).join(', ') || 'aucune'], ['Repas plaisir', `${p.cheat ?? 1} par semaine`], ['Budget', M.BUDGETS[p.budget || 'moyen']], ['Temps de cuisine', M.TEMPS[p.temps || 'libre']], ['Région', M.REGIONS[window.NA_I18N.region]]);
+    if (nutrition) rows.push(['Niveau d’activité', activity(p).label], ['Régime', M.REGIMES[p.regime || 'omni']], ['Pratiques', (p.pratiques || []).map((x) => M.PRATIQUES[x]).join(', ') || 'aucune'], ['Repas plaisir', `${p.cheat ?? 1} par semaine`], ['Budget', M.BUDGETS[p.budget || 'moyen']], ['Temps de cuisine', M.TEMPS[p.temps || 'libre']], ['Mode OMAD', p.omad && p.omad.on ? `Actif, repas à ${p.omad.at}` : 'Non'], ['Région', M.REGIONS[window.NA_I18N.region]]);
     else rows.push(['Niveau', `<span data-lv>${lvLabel(p.niveau)}</span>`], ['Séances', `${p.seances} par semaine`], ['Durée', `${durOf(p)} min par séance`], ['Matériel', p.materiel.map((m) => MATERIEL[m]).join(', ')]);
     return `<dl class="facts">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${k === 'Niveau' ? v : esc(v)}</dd></div>`).join('')}</dl>`;
   }
@@ -887,6 +968,12 @@
     const add = (name0, grams, pieces) => { const name = name0 === 'Œufs entiers' ? 'Œufs' : name0; const k = name; const v = items.get(k) || { n: name, g: 0, pcs: 0, dry: DRY.test(name) && (/cuit/.test(name) || /^Riz (rond|vinaigré)$/.test(name)) }; v.g += grams || 0; v.pcs += pieces || 0; items.set(k, v); };
     for (let i = 0; i < 7; i++) {
       const it = plan.byDay(i);
+      if (omadOn(sess)) {
+        const o = omadFor(sess, i);
+        if (o.main) o.main.ing.forEach((x) => { const pc = x.q.match(/^(\d+) pièces$/); const g = x.q.match(/^(\d+) g$/); if (pc) add(x.n, 0, +pc[1]); else if (g) add(x.n, +g[1]); });
+        o.sides.forEach((s) => snacks.set(s.n, (snacks.get(s.n) || 0) + 1));
+        continue;
+      }
       const b = breakfast(p, it ? 1.08 : 0.95);
       b.items.forEach((x) => { const f = FOOD[x.id]; add(f.n + (x.id === 'dinde' ? b.meat : ''), x.g); });
       const m = mealsFor(sess, i);
@@ -919,7 +1006,7 @@
         <header class="card-head"><span class="chip-ico">${icon('calendar')}</span><div><h2 class="h2">Semaine du ${dayDate(0).toLocaleDateString(window.NA_I18N.locale, { day: 'numeric', month: 'long' })}</h2><p class="muted"><span>${done} articles cochés sur ${total}</span> · ${esc(M.summary(sess.profile))}</p></div>
           ${done ? '<button type="button" class="link-btn" data-act="shop-reset">Tout décocher</button>' : ''}</header>
         <div class="shop-grid">${sl.groups.map(([aisle, list]) => `<section class="shop-aisle"><h3 class="h3">${aisle}</h3><ul>${list.map((v) => `<li><label class="shop-item${checked.has(v.n) ? ' is-checked' : ''}"><input type="checkbox" data-shop="${esc(v.n)}"${checked.has(v.n) ? ' checked' : ''}><span class="shop-box" aria-hidden="true">${icon('check')}</span><span class="shop-name">${esc(v.n)}</span><b class="shop-qty">${qtyLabel(v)}</b></label></li>`).join('')}</ul></section>`).join('')}
-          ${sl.snacks.length ? `<section class="shop-aisle"><h3 class="h3">Collations</h3><ul>${sl.snacks.map(([n, k]) => `<li class="shop-snack"><span>${esc(n)}</span><b>× ${k}</b></li>`).join('')}</ul></section>` : ''}</div>
+          ${sl.snacks.length ? `<section class="shop-aisle"><h3 class="h3">${omadOn(sess) ? 'Compléments du repas' : 'Collations'}</h3><ul>${sl.snacks.map(([n, k]) => `<li class="shop-snack"><span>${esc(n)}</span><b>× ${k}</b></li>`).join('')}</ul></section>` : ''}</div>
         <p class="hint">Les quantités sont des estimations, arrondies pour faciliter les courses. Riz, pâtes et céréales sont indiqués en poids sec.</p>
       </article>${foot()}`;
   }
@@ -928,7 +1015,7 @@
     const T = (x) => window.NA_I18N.t(x); const sl = shoppingList(sess); const checked = new Set(sess.shop[weekId] || []);
     const lines = [`Kin Fit · ${T('Liste de courses')}`];
     sl.groups.forEach(([aisle, list]) => { lines.push('', T(aisle)); list.forEach((v) => lines.push(`${checked.has(v.n) ? '[x]' : '[ ]'} ${T(v.n)} · ${T(qtyLabel(v))}`)); });
-    if (sl.snacks.length) { lines.push('', T('Collations')); sl.snacks.forEach(([n, k]) => lines.push(`- ${T(n)} × ${k}`)); }
+    if (sl.snacks.length) { lines.push('', T(omadOn(sess) ? 'Compléments du repas' : 'Collations')); sl.snacks.forEach(([n, k]) => lines.push(`- ${T(n)} × ${k}`)); }
     return lines.join('\n');
   }
 
@@ -991,13 +1078,14 @@
     // Today: what you ate against what you need, then today's dishes.
     const m = mealsFor(sess, todayIdx);
     return html.replace(/<div class="today-grid">[\s\S]*$/, `<div class="today-grid"><div class="stack">${dayFoodCard(sess)}${breakfastCard(sess, buildPlan(dayView(sess, todayIdx)).byDay(todayIdx), lg(sess, iso(TODAY)), { full: true, readOnly: true })}</div>
-      <div class="stack"><article class="card card--nutrition"><header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Déjeuner et dîner</h2><p class="muted">${esc(M.summary(sess.profile))}</p></div></header>${dishBlock('Déjeuner', m.dej)}${dishBlock('Dîner', m.diner)}${m.snack ? `<p class="meal-snack"><span class="label">Collation</span> ${esc(m.snack.n)}</p>` : ''}</article></div></div>${foot()}`);
+      <div class="stack">${omadOn(sess) ? '' : `<article class="card card--nutrition"><header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Déjeuner et dîner</h2><p class="muted">${esc(M.summary(sess.profile))}</p></div></header>${dishBlock('Déjeuner', m.dej)}${dishBlock('Dîner', m.diner)}${m.snack ? `<p class="meal-snack"><span class="label">Collation</span> ${esc(m.snack.n)}</p>` : ''}</article>`}${omadPromo(sess)}</div></div>${foot()}`);
   }
 
   function dayFoodCard(sess) {
     const p = sess.profile; const it = buildPlan(dayView(sess, todayIdx)).byDay(todayIdx); const L0 = lg(sess, iso(TODAY)); const eat = L0.eat || {};
     const b = breakfast(p, it ? 1.08 : 0.95); const m = mealsFor(sess, todayIdx);
     const rows = [['pdj', 'Petit-déjeuner', b.tot.k, !!L0.pdj], ['dej', 'Déjeuner', m.dej ? m.dej.k : 0, !!eat.dej], ['diner', 'Dîner', m.diner ? m.diner.k : 0, !!eat.diner], ['snack', 'Collation', Math.round(m.kcal * 0.1), !!eat.snack]];
+    if (omadOn(sess)) rows.splice(0, rows.length, ['pdj', 'Repas unique', omadFor(sess, todayIdx).tot.k, !!L0.pdj]);
     (L0.photos || []).forEach((x) => { const r = rows.find((y) => y[0] === x.slot); if (r) { r[2] = x.kcal; r[3] = true; r[4] = x.plat; } else rows.push(['extra', 'Extra', x.kcal, true, x.plat]); });
     const got = rows.reduce((t, r) => t + (r[3] ? r[2] : 0), 0); const C = 2 * Math.PI * 52; const f = Math.min(1, got / (m.kcal || 1));
     return `<article class="card food-day"><header class="card-head"><span class="chip-ico">${icon('flame')}</span><div><h2 class="h2">Ta journée</h2><p class="muted">${it ? 'Jour d’entraînement' : 'Jour de repos'} · besoin estimé ${m.kcal} kcal</p></div></header>
@@ -1028,10 +1116,10 @@
       const nutBtns = AI.can('nutrition') ? `<div class="actions"><button type="button" class="btn" data-act="ai-nut"${ui.aiBusy ? ' disabled' : ''}>${icon('star')}${nut ? 'Réécrire avec l’IA' : 'Ma journée avec l’IA'}</button>${nut ? '<button type="button" class="btn btn--ghost" data-act="ai-nut-clear">Version exemple</button>' : ''}</div>` : '';
       const today = ui.aiBusy === 'nut' ? aiBusyCard('Le coach IA prépare tes repas du jour. Compte une vingtaine de secondes.')
         : nut ? aiNutritionCards(nut, sess) : breakfastCard(sess, item, lg(sess, iso(TODAY)), { full: true, readOnly: true });
-      return `<header class="hello"><div><h1 class="h1">Nutrition</h1><p class="lede">Besoin estimé : ${dailyKcal(p)} kcal par jour. Petit-déjeuner 25 %, déjeuner 35 %, dîner 30 %, collation 10 %, ajustés selon que tu t’entraînes ou non.</p></div>${nutBtns}</header>${tabs}
+      return `<header class="hello"><div><h1 class="h1">Nutrition</h1><p class="lede">Besoin estimé : ${dailyKcal(p)} kcal par jour. ${omadOn(sess) ? `Mode OMAD : tout en un repas, fenêtre ${omadWindow(p)}.` : 'Petit-déjeuner 25 %, déjeuner 35 %, dîner 30 %, collation 10 %, ajustés selon que tu t’entraînes ou non.'}</p></div>${nutBtns}</header>${tabs}
         <div class="today-grid"><div class="stack">${today}
           <article class="card card--nutrition"><header class="card-head"><span class="chip-ico">${icon('calendar')}</span><div><h2 class="h2">Repas de la semaine</h2><p class="muted">${esc(M.summary(p))}</p></div></header>
-            <div class="week-meals">${DAYS.map((l, i) => { const m = mealsFor(sess, i); const cheat = (m.dej && m.dej.cheat) || (m.diner && m.diner.cheat); return `<details${i === todayIdx ? ' open' : ''}><summary><span class="wm-day">${DAYS_FULL[i]}</span><span class="wm-names">${esc(m.dej ? m.dej.n : '—')} · ${esc(m.diner ? m.diner.n : '—')}</span>${cheat ? '<span class="tag">Plaisir</span>' : ''}</summary>${dishBlock('Déjeuner', m.dej)}${dishBlock('Dîner', m.diner)}</details>`; }).join('')}</div>
+            <div class="week-meals">${DAYS.map((l, i) => { const m = mealsFor(sess, i); const cheat = (m.dej && m.dej.cheat) || (m.diner && m.diner.cheat); return `<details${i === todayIdx ? ' open' : ''}><summary><span class="wm-day">${DAYS_FULL[i]}</span><span class="wm-names">${omadOn(sess) ? esc(omadFor(sess, i).main.n) : `${esc(m.dej ? m.dej.n : '—')} · ${esc(m.diner ? m.diner.n : '—')}`}</span>${cheat ? '<span class="tag">Plaisir</span>' : ''}</summary>${omadOn(sess) ? dishBlock('Repas unique', omadFor(sess, i).main) : dishBlock('Déjeuner', m.dej) + dishBlock('Dîner', m.diner)}</details>`; }).join('')}</div>
           </article></div>
         <div class="stack"><article class="card"><header class="card-head"><span class="chip-ico">${icon('user')}</span><div><h2 class="h2">Profil nutrition</h2></div></header>${profileFacts(p, true)}
           <p><b>À éviter :</b> ${p.eviter.length ? esc(p.eviter.map((a) => ALLERG[a]).join(', ')) : 'rien de signalé'}.</p>
@@ -1979,6 +2067,9 @@
     if (a === 'ai-setup') { go('profil'); const c = $('#plus-card') || $$('.ai-card').find((x) => x.querySelector('input[name="aiprov"]')); if (c) c.scrollIntoView({ block: 'start' }); return; }
     if (a === 'checkin') return openCheckin();
     if (a === 'checkin-close') { const d = $('#checkin'); if (d) d.close(); return; }
+    if (a === 'omad-open') { openOmad(); return; }
+    if (a === 'omad-close') { const d = $('#omad'); if (d) d.close(); return; }
+    if (a === 'omad-off' && sess) { sess.profile.omad = { ...(sess.profile.omad || {}), on: false }; save(); const d = $('#omad'); if (d) d.close(); render(); toast('Mode OMAD désactivé : tes trois repas reviennent.'); return; }
     if (a === 'parcours') { ui.sportTab = 'parcours'; return go('sport'); }
     if (a === 'start' && sess && ui.day === todayIdx) {
       const sv = dayView(sess, todayIdx);
@@ -2078,6 +2169,15 @@
 
   document.addEventListener('submit', (e) => {
     if (e.target.id === 'launch-form' || e.target.id === 'give-form') { e.preventDefault(); return; }
+    if (e.target.id === 'omad-form') {
+      e.preventDefault(); const sess = cur(); if (!sess) return;
+      const fd = new FormData(e.target); const boxes = e.target.querySelectorAll('input[name="ok"]');
+      if (boxes.length && [...boxes].some((b) => !b.checked)) { $('#omad-error').textContent = 'Coche toutes les cases. Sinon, le mode OMAD n’est pas fait pour toi en ce moment : garde tes trois repas.'; return; }
+      const was = omadOn(sess);
+      sess.profile.omad = { on: true, at: fd.get('at') || '19:00', since: (sess.profile.omad && sess.profile.omad.since && was) ? sess.profile.omad.since : iso(TODAY) };
+      save(); $('#omad').close(); render(); toast(was ? 'Heure du repas enregistrée.' : 'Mode OMAD activé. Ton repas unique remplace tes trois repas.');
+      return;
+    }
     if (e.target.id === 'checkin-form') {
       e.preventDefault(); const sess = cur(); if (!sess) return;
       const fd = new FormData(e.target); const min = +(fd.get('min') || 0);

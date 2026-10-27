@@ -176,10 +176,10 @@
     return { ing, alts: alts.slice(0, 4), cost: ['petit', 'moyen', 'élevé'][cost - 1], tag };
   }
 
-  function portion(d, target, p) {
+  function portion(d, target, p, maxF = 1.4) {
     if (!d) return null;
     const cheat = d.t === 'cheat';
-    const f = cheat ? 1 : Math.min(1.4, Math.max(0.75, target / d.k));
+    const f = cheat ? 1 : Math.min(maxF, Math.max(0.75, target / d.k));
     const sx = meatSuffix(p);
     const sw = swap(d, f, p, sx);
     return {
@@ -233,9 +233,35 @@
     };
   }
 
+  /* ---------- OMAD: one complete meal a day ---------- */
+  // A larger main dish, then sides that bring protein, fibre and the rest of the day's energy.
+  const OMAD_SIDES = [
+    [{ n: 'Skyr ou fromage blanc nature (200 g)', k: 130, p: 20, g: 8, l: 1, tags: ['lactose', 'animal'] }, { n: 'Yaourt de soja nature (2 pots)', k: 140, p: 10, g: 6, l: 8, tags: ['soja'] }, { n: 'Pois chiches rôtis (80 g)', k: 130, p: 7, g: 20, l: 3, tags: [] }],
+    [{ n: 'Grande salade composée et vinaigrette', k: 150, p: 3, g: 8, l: 12, tags: [] }, { n: 'Soupe de légumes maison', k: 120, p: 4, g: 18, l: 3, tags: [] }],
+    [{ n: 'Fruit et 25 g d’amandes', k: 240, p: 6, g: 22, l: 14, tags: ['coque'] }, { n: 'Fruit et 25 g de graines de courge', k: 230, p: 9, g: 20, l: 12, tags: [] }],
+    [{ n: 'Pain complet (80 g)', k: 190, p: 7, g: 34, l: 2, tags: ['gluten'] }, { n: 'Patate douce rôtie (200 g)', k: 180, p: 3, g: 40, l: 1, tags: [] }],
+  ];
+  function omadMeal(p, seed, dayIdx, weekNo, trainingDay) {
+    const f = forbidden(p); const kcal = NA.dailyKcal(p) * (trainingDay ? 1.05 : 0.97);
+    const plats = byTime(DISHES.filter((d) => d.t === 'plat' && allowed(d, f, p)), p);
+    const cheats = DISHES.filter((d) => d.t === 'cheat' && allowed(d, f, p));
+    let d = pick(plats, dayIdx * 3 + seed * 5 + weekNo + 1);
+    if (+(p.cheat ?? 1) >= 1 && dayIdx === 5 && cheats.length) d = pick(cheats, seed + weekNo);
+    // Sides take up to 40 % of the day, then the main dish is sized to the rest.
+    const sides = []; let room = kcal * 0.4;
+    OMAD_SIDES.forEach((group, gi) => {
+      const c = pick(group.filter((s) => !s.tags.some((t) => f.has(t))), dayIdx + seed + gi);
+      if (c && room > c.k * 0.6) { sides.push(c); room -= c.k; }
+    });
+    const main = portion(d, kcal - sides.reduce((t, x) => t + x.k, 0), p, 2.6);
+    const tot = { k: 0, p: 0, g: 0, l: 0 };
+    [main, ...sides].filter(Boolean).forEach((x) => { ['k', 'p', 'g', 'l'].forEach((m) => { tot[m] += x[m]; }); });
+    return { main, sides, tot, kcal: Math.round(kcal) };
+  }
+
   const CHEAT_TIP = 'Repas plaisir : savoure-le sans culpabilité, mange lentement, ajoute des légumes si tu peux et bois de l’eau. Pas de compensation le lendemain, on reprend simplement le plan.';
 
   const BUDGETS = { serre: 'Serré', moyen: 'Moyen', confort: 'Confort' };
   const REGIONS = { eu: 'Europe', maghreb: 'Maghreb', afrique: 'Afrique de l’Ouest et centrale', na: 'Amérique du Nord', latam: 'Amérique latine' };
-  window.NA_MEALS = { ALLERGENES, REGIMES, PRATIQUES, BUDGETS, REGIONS, TEMPS, forbidden, summary, meatSuffix, dayMeals, breakfastAlts, CHEAT_TIP, DISHES };
+  window.NA_MEALS = { ALLERGENES, REGIMES, PRATIQUES, BUDGETS, REGIONS, TEMPS, forbidden, summary, meatSuffix, dayMeals, omadMeal, breakfastAlts, CHEAT_TIP, DISHES };
 })();
