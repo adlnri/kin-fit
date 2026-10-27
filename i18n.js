@@ -28,6 +28,11 @@
   /* Strings added after the bulk translation (welcome, budget, regions, alternatives, patterns' words). */
   const EXTRA = {
     'Bienvenue': ['Welcome', 'Bienvenido'],
+    "Voir la recette": ["See the recipe", "Ver la receta"],
+    "Ingrédients pour toi": ["Ingredients for you", "Ingredientes para ti"],
+    "Préparation": ["Method", "Preparación"],
+    "Touche une étape quand elle est faite.": ["Tap a step when it is done.", "Toca un paso cuando esté hecho."],
+    "Les quantités suivent ta portion du jour ; les étapes parlent de la viande, du poisson ou de la céréale si ton budget ou ta région ont changé un ingrédient.": ["Quantities follow today’s portion; steps refer to the meat, fish or grain if your budget or region changed an ingredient.", "Las cantidades siguen tu ración del día; los pasos hablan de la carne, el pescado o el cereal si tu presupuesto o tu región cambiaron un ingrediente."],
     "Nutrition": ["Nutrition", "Nutrición"],
     "Programme": ["Programme", "Programa"],
     "Exercices": ["Exercises", "Ejercicios"],

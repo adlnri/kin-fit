@@ -617,6 +617,32 @@
     return `<div class="alts"><p class="label">Alternatives</p><ul>${alts.map((a) => `<li><span>${esc(a.from)}</span><span class="alt-arrow" aria-hidden="true">→</span><span>${esc(a.to)}</span><small>${esc(a.kind)}</small></li>`).join('')}</ul></div>`;
   }
 
+  // Dishes shown on screen, by id and portion, so the recipe sheet can show the same quantities.
+  const SHOWN = {};
+  const recipeBtn = (d, cls = 'btn btn--glass') => {
+    if (!d || d.ai || !window.NA_RECIPES || !window.NA_RECIPES.has(d.id)) return '';
+    const key = `${d.id}-${d.k}`; SHOWN[key] = d;
+    return `<button type="button" class="${cls}" data-recipe="${key}">${icon('bowl')}Voir la recette</button>`;
+  };
+
+  function openRecipe(key) {
+    const d = SHOWN[key]; const r = d && window.NA_RECIPES.get(d.id); if (!r) return;
+    const old = $('#recipe'); if (old) old.remove();
+    const dlg = document.createElement('dialog'); dlg.id = 'recipe'; dlg.className = 'dlg dlg--full recipe'; dlg.setAttribute('aria-labelledby', 'recipe-title');
+    dlg.innerHTML = `<div class="dlg-body">
+      <header class="dlg-head"><div><h2 class="h2" id="recipe-title">${esc(d.n)}</h2><p class="muted">≈ ${r.min} min · ${d.k} kcal · Protéines ${d.p} g</p></div><button type="button" class="round" data-act="recipe-close" aria-label="Fermer">${icon('x')}</button></header>
+      <section class="exo-part"><h3 class="h3">Ingrédients pour toi</h3><ul class="ingr">${d.ing.map((i) => `<li><span>${esc(i.n)}</span><b>${esc(i.q)}</b></li>`).join('')}</ul></section>
+      <section class="exo-part"><h3 class="h3">Préparation</h3><p class="hint">Touche une étape quand elle est faite.</p>
+        <ol class="rc-steps" data-no-i18n>${r.steps.map((x, i) => `<li><button type="button" data-rstep="${i}" aria-pressed="false"><span class="rc-n">${i + 1}</span><span>${esc(x)}</span></button></li>`).join('')}</ol></section>
+      ${r.prep ? `<p class="note" data-no-i18n>${esc(r.prep)}</p>` : ''}
+      ${d.cheat ? `<p class="gold">${esc(M.CHEAT_TIP)}</p>` : ''}
+      <p class="hint">Les quantités suivent ta portion du jour ; les étapes parlent de la viande, du poisson ou de la céréale si ton budget ou ta région ont changé un ingrédient.</p>
+    </div>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener('close', () => dlg.remove());
+    dlg.showModal();
+  }
+
   function dishBlock(label, d) {
     if (!d) return `<section class="meal"><p class="label">${label}</p><p class="muted">Aucun plat ne correspond à toutes tes restrictions pour ce repas. Modifie ton profil ou demande au coach.</p></section>`;
     return `<section class="meal${d.cheat ? ' meal--cheat' : ''}">
@@ -629,6 +655,7 @@
         ${altList(d.alts)}
         <p>${d.ai ? ai(d.why) : esc(d.why)}</p>${d.cheat ? `<p class="gold">${esc(M.CHEAT_TIP)}</p>` : ''}
       </div></details>
+      ${recipeBtn(d)}
     </section>`;
   }
 
@@ -944,7 +971,7 @@
     const got = rows.reduce((t, r) => t + (r[3] ? r[2] : 0), 0); const C = 2 * Math.PI * 52; const f = Math.min(1, got / (m.kcal || 1));
     return `<article class="card food-day"><header class="card-head"><span class="chip-ico">${icon('flame')}</span><div><h2 class="h2">Ta journée</h2><p class="muted">${it ? 'Jour d’entraînement' : 'Jour de repos'} · besoin estimé ${m.kcal} kcal</p></div></header>
       <div class="food-top"><div class="hero-ring food-ring" role="img" aria-label="${got} kcal sur ${m.kcal}"><svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="food-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e3a1"/><stop offset=".45" stop-color="#d4af37"/><stop offset="1" stop-color="#8a6416"/></linearGradient></defs><circle class="ring-track" cx="60" cy="60" r="52"/><circle class="ring-val" cx="60" cy="60" r="52" stroke="url(#food-gold)" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - f)).toFixed(1)}"/></svg><p><b>${got}</b><span>sur ${m.kcal} kcal</span></p></div>
-        <ul class="food-rows">${rows.map(([k, n, kc, ok]) => `<li class="${ok ? 'is-on' : ''}"><span><b>${n}</b><small>≈ ${kc} kcal</small></span><span class="food-acts">${k === 'dej' || k === 'diner' ? `<button type="button" class="link-btn" data-swap="${k}">Autre idée</button>` : ''}<button type="button" class="btn btn--${ok ? 'done' : 'cat'}" data-eat="${k}" aria-pressed="${ok}">${ok ? icon('check') + 'Mangé' : 'J’ai mangé ça'}</button></span></li>`).join('')}</ul></div>
+        <ul class="food-rows">${rows.map(([k, n, kc, ok]) => `<li class="${ok ? 'is-on' : ''}"><span><b>${n}</b><small>≈ ${kc} kcal</small></span><span class="food-acts">${k === 'dej' || k === 'diner' ? `${recipeBtn(m[k], 'link-btn')}<button type="button" class="link-btn" data-swap="${k}">Autre idée</button>` : ''}<button type="button" class="btn btn--${ok ? 'done' : 'cat'}" data-eat="${k}" aria-pressed="${ok}">${ok ? icon('check') + 'Mangé' : 'J’ai mangé ça'}</button></span></li>`).join('')}</ul></div>
     </article>`;
   }
 
@@ -1671,6 +1698,8 @@
     if (t.dataset.copy && sess) { const x = sess.inbox.find((y) => y.id === t.dataset.copy); if (x) { const r = await shareItem(x, sess); if (r) toast(r === 'copié' ? 'Lien copié. Envoie-le à qui tu veux.' : 'Défi partagé.'); } return; }
     if (t.dataset.give && sess) return openGive(t.dataset.give);
     if (t.dataset.exo) return openExo(t.dataset.exo);
+    if (t.dataset.recipe) return openRecipe(t.dataset.recipe);
+    if (t.dataset.rstep) { const on = t.getAttribute('aria-pressed') !== 'true'; t.setAttribute('aria-pressed', String(on)); if (on && navigator.vibrate) navigator.vibrate(15); return; }
     if (t.dataset.faccept) { try { await CLOUD.acceptFriend(+t.dataset.faccept); toast('Ami ajouté.'); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
     if (t.dataset.fremove) { try { await CLOUD.removeFriend(+t.dataset.fremove); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
     if (t.dataset.bf && sess) { sess.profile.petitdej = t.dataset.bf; save(); render(); return refocus(`[data-bf="${t.dataset.bf}"]`); }
@@ -1781,6 +1810,7 @@
       if (!sv.rest && buildPlan(sv).byDay(todayIdx)) return openGuide();
     }
     if (a === 'exo-close') { const d = $('#exo'); if (d) d.close(); return; }
+    if (a === 'recipe-close') { const d = $('#recipe'); if (d) d.close(); return; }
     if (a === 'g-quit' || a === 'g-finish') { const d = $('#guide'); if (d) d.close(); return; }
     if (a === 'g-set' && ui.guide) {
       const g = ui.guide; const st = g.steps[g.k]; const L0g = lg(sess, iso(TODAY));

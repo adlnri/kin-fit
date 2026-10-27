@@ -927,3 +927,12 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 .exo-anim--gold .exo-frames::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, .75) 100%); pointer-events: none; }
 .lib-ph { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #fff; border-radius: 12px; }
 @media (prefers-reduced-motion: reduce) { .exo-frames img:last-child { animation: none; opacity: 0; } }
+
+/* ---------- Recipe sheet ---------- */
+.rc-steps { list-style: none; display: grid; gap: 8px; padding: 0; }
+.rc-steps button { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-items: start; width: 100%; text-align: left; padding: 12px; border-radius: 14px; border: 1px solid rgba(212, 175, 55, .25); background: rgba(255, 255, 255, .03); color: inherit; font: inherit; cursor: pointer; }
+.rc-n { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(212, 175, 55, .6); color: var(--gold-hi, #f6e3a1); font-weight: 800; }
+.rc-steps button[aria-pressed="true"] { opacity: .55; }
+.rc-steps button[aria-pressed="true"] .rc-n { background: var(--gold-fill, #d4af37); color: var(--on, #111); border-color: transparent; }
+.rc-steps button[aria-pressed="true"] span:last-child { text-decoration: line-through; }
+.meal > [data-recipe] { margin-top: 10px; }
