@@ -168,5 +168,5 @@
     return { min: r.min, steps: r[l] || r.fr, prep: r.prep ? r.prep[l] || r.prep.fr : '' };
   }
 
-  window.NA_RECIPES = { get, has: (id) => !!R[id] };
+  window.NA_RECIPES = { get, has: (id) => !!R[id], add: (more) => Object.assign(R, more) };
 })();

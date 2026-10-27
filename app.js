@@ -145,7 +145,7 @@
   const lg = (sess, d) => { sess.log[d] = sess.log[d] || { ex: [], pdj: false, eau: 0, mob: false, status: '' }; return sess.log[d]; };
 
   const ui = { view: 'today', day: todayIdx, ob: null, defisTab: 'jour', planTab: 'programme', confirmDelete: false, printing: false, aiBusy: null, circuit: 'corps', circuitDur: null };
-  const blank = () => ({ prenom: '', sexe: '', age: '', taille: '', poids: '', objectif: '', niveau: 50, seances: 3, duree: 60, materiel: [], restrictions: '', sports: [], autre: '', petitdej: '', eviter: [], regime: 'omni', pratiques: [], cheat: 1, budget: 'moyen' });
+  const blank = () => ({ prenom: '', sexe: '', age: '', taille: '', poids: '', objectif: '', niveau: 50, seances: 3, duree: 60, materiel: [], restrictions: '', sports: [], autre: '', petitdej: '', eviter: [], regime: 'omni', pratiques: [], cheat: 1, budget: 'moyen', temps: 'libre' });
 
   /* ---------- Challenges ---------- */
 
@@ -247,18 +247,26 @@
   const b64e = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const b64d = (s) => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
 
+  const cleanPseudo = (x) => { const p = String(x || '').trim(); return /^[A-Za-z0-9_.-]{3,20}$/.test(p) ? p : ''; };
   function readShare() {
+    const a = location.hash.match(/^#ami=([^&#]+)$/);
     const m = location.hash.match(/^#defi=([A-Za-z0-9_-]+)$/);
-    if (!m) return;
-    try {
+    if (!m && !a) return;
+    if (a) { let p = ''; try { p = cleanPseudo(decodeURIComponent(a[1])); } catch (e) { p = ''; } if (p) state.pendingFriend = p; }
+    if (m) try {
       const o = b64d(m[1]); const c = SOCIAL.find((x) => x.cid === o.cid);
       if (c) state.pendingShare = { id: String(o.id || Date.now()).replace(/[^\w-]/g, '').slice(0, 40), cid: c.cid, from: String(o.from || 'Un ami').slice(0, 40), msg: String(o.msg || '').slice(0, 120) };
+      if (cleanPseudo(o.p)) state.pendingFriend = cleanPseudo(o.p);
     } catch (e) { /* malformed link: ignore it */ }
     history.replaceState(null, '', location.pathname + location.search);
     save();
   }
 
-  const shareLink = (item, sess) => `${location.href.split('#')[0]}#defi=${b64e({ v: 1, id: item.id, cid: item.cid, from: sess.profile.prenom, msg: item.msg || '' })}`;
+  const myPseudo = () => (CLOUD.linked && CLOUD.profile.pseudo) || '';
+  const appUrl = () => location.href.split('#')[0].split('?')[0];
+  const shareLink = (item, sess) => `${appUrl()}#defi=${b64e({ v: 1, id: item.id, cid: item.cid, from: sess.profile.prenom, msg: item.msg || '', p: myPseudo() })}`;
+  // The app link; with an account it carries the pseudo so the friend can add you in one tap.
+  const inviteLink = () => `${appUrl()}${myPseudo() ? `#ami=${encodeURIComponent(myPseudo())}` : ''}`;
 
   function addToInbox(sess, entry) {
     if (sess.inbox.some((x) => x.id === entry.id)) return false;
@@ -660,7 +668,7 @@
       <p class="label">${label}${d.cheat ? ' · <span class="gold">Repas plaisir</span>' : ''}</p>
       <h3 class="meal-name">${d.ai ? ai(d.n) : esc(d.n)}</h3>
       <p class="meal-macros"><b>${d.k} kcal</b> · Protéines ${d.p} g · Glucides ${d.g} g · Lipides ${d.l} g</p>
-      <p class="meal-cost"><span>Coût :</span> <b>${d.cost}</b></p>
+      <p class="meal-cost"><span>Coût :</span> <b>${d.cost}</b>${d.min ? ` · <span>Temps :</span> <b data-no-i18n>${d.min} min</b>` : ''}</p>
       <details><summary>Ingrédients et conseils</summary><div class="more">
         <ul class="ingr">${d.ing.map((i) => (d.ai ? `<li>${ai(i.n)}<b data-no-i18n>${esc(i.q)}</b></li>` : `<li><span>${esc(i.n)}</span><b>${esc(i.q)}</b></li>`)).join('')}</ul>
         ${altList(d.alts)}
@@ -703,10 +711,20 @@
     ? '<p class="foot">Les programmes et repas marqués « coach IA » sont écrits par une IA à partir de ton profil ; les autres sont des exemples calculés dans ton navigateur. Charges et valeurs nutritionnelles sont des estimations. En cas de douleur ou de pathologie, demande l’avis d’un professionnel de santé.</p>'
     : '<p class="foot">Prototype : programmes, défis et valeurs sont des exemples calculés dans ton navigateur, aucun modèle d’IA n’est encore connecté. Les valeurs nutritionnelles sont des estimations. En cas de douleur ou de pathologie, demande l’avis d’un professionnel de santé.</p>');
 
+  function friendBanner() {
+    const p = state.pendingFriend; if (!p || !CLOUD.enabled) return '';
+    if (CLOUD.linked && (p.toLowerCase() === myPseudo().toLowerCase() || (ui.friends || []).some((f) => f.pseudo.toLowerCase() === p.toLowerCase()))) return '';
+    return `<aside class="banner defi--amis" aria-label="Invitation reçue par lien">
+      <span class="chip-ico">${icon('user')}</span>
+      <div><p class="banner-title" data-no-i18n>${esc(p)}</p><p>${CLOUD.linked ? 't’invite à devenir amis sur Kin Fit.' : 't’invite sur Kin Fit. Crée ton compte gratuit pour devenir amis et vous lancer des défis.'}</p></div>
+      <div class="actions">${CLOUD.linked ? '<button type="button" class="btn" data-act="invite-accept">Ajouter en ami</button>' : '<button type="button" class="btn" data-view="profil">Créer mon compte</button>'}<button type="button" class="btn btn--ghost" data-act="invite-later">Plus tard</button></div>
+    </aside>`;
+  }
+
   function pendingBanner() {
-    const x = state.pendingShare; if (!x) return '';
+    const x = state.pendingShare; if (!x) return friendBanner();
     const c = SOCIAL.find((s) => s.cid === x.cid); if (!c) return '';
-    return `<aside class="banner defi--${c.cat}" aria-label="Défi reçu par lien">
+    return `${friendBanner()}<aside class="banner defi--${c.cat}" aria-label="Défi reçu par lien">
       <span class="chip-ico">${icon('inbox')}</span>
       <div><p class="banner-title">${esc(x.from)} te lance un défi : ${esc(c.title)}</p>${x.msg ? `<p>« ${esc(x.msg)} »</p>` : ''}</div>
       <div class="actions"><button type="button" class="btn" data-act="share-accept">Relever le défi</button><button type="button" class="btn btn--ghost" data-act="share-later">Plus tard</button></div>
@@ -847,7 +865,7 @@
 
   function profileFacts(p, nutrition) {
     const rows = [['Sexe', p.sexe === 'femme' ? 'Femme' : 'Homme'], ['Âge', `${p.age} ans`], ['Taille', `${p.taille} cm`], ['Poids', `${p.poids} kg`], ['Objectif', OBJECTIFS[p.objectif]], [nutrition ? 'Sport principal' : 'Sports', nutrition ? sportName(p) : sportList(p)]];
-    if (nutrition) rows.push(['Niveau d’activité', activity(p).label], ['Régime', M.REGIMES[p.regime || 'omni']], ['Pratiques', (p.pratiques || []).map((x) => M.PRATIQUES[x]).join(', ') || 'aucune'], ['Repas plaisir', `${p.cheat ?? 1} par semaine`], ['Budget', M.BUDGETS[p.budget || 'moyen']], ['Région', M.REGIONS[window.NA_I18N.region]]);
+    if (nutrition) rows.push(['Niveau d’activité', activity(p).label], ['Régime', M.REGIMES[p.regime || 'omni']], ['Pratiques', (p.pratiques || []).map((x) => M.PRATIQUES[x]).join(', ') || 'aucune'], ['Repas plaisir', `${p.cheat ?? 1} par semaine`], ['Budget', M.BUDGETS[p.budget || 'moyen']], ['Temps de cuisine', M.TEMPS[p.temps || 'libre']], ['Région', M.REGIONS[window.NA_I18N.region]]);
     else rows.push(['Niveau', `<span data-lv>${lvLabel(p.niveau)}</span>`], ['Séances', `${p.seances} par semaine`], ['Durée', `${durOf(p)} min par séance`], ['Matériel', p.materiel.map((m) => MATERIEL[m]).join(', ')]);
     return `<dl class="facts">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${k === 'Niveau' ? v : esc(v)}</dd></div>`).join('')}</dl>`;
   }
@@ -1180,6 +1198,7 @@
     return `<article class="card friends">${head(`Ton pseudo : ${esc(CLOUD.profile.pseudo)}`)}
       <form id="friend-form" class="friend-add" novalidate><label class="sr-only" for="friend-pseudo">Pseudo de ton ami</label><input class="input" id="friend-pseudo" type="text" maxlength="20" autocapitalize="off" spellcheck="false" placeholder="Pseudo de ton ami"><button type="submit" class="btn btn--amis">${icon('plus')}Ajouter</button></form>
       <p class="hint ai-status" id="friend-status" role="status"></p>
+      <div class="actions"><button type="button" class="btn btn--ghost" data-act="share-app">${icon('share')}Inviter par lien</button></div>
       ${inc.length ? `<ul class="session-list">${inc.map((f) => `<li>${av(f.pseudo)}<span><b>${esc(f.pseudo)}</b><small>veut être ton ami</small></span><span class="actions"><button type="button" class="btn btn--amis" data-faccept="${f.friendship_id}">Accepter</button><button type="button" class="btn btn--ghost" data-fremove="${f.friendship_id}">Refuser</button></span></li>`).join('')}</ul>` : ''}
       ${ok.length ? `<ul class="session-list">${ok.map((f) => `<li>${av(f.pseudo)}<span><b>${esc(f.pseudo)}</b><small>Ami</small></span><button type="button" class="link-btn" data-fremove="${f.friendship_id}">Retirer</button></li>`).join('')}</ul>` : '<p class="empty">Ajoute un ami avec son pseudo : il recevra ta demande.</p>'}
       ${out.length ? `<p class="hint">En attente de réponse : ${out.map((f) => esc(f.pseudo)).join(', ')}</p>` : ''}
@@ -1263,6 +1282,9 @@
           <div class="actions"><button type="button" class="btn" data-act="edit">Modifier mon profil</button><button type="button" class="btn btn--ghost" data-act="new">Nouvelle session</button></div></article>
         ${plusCard()}
         ${accountCard(sess)}
+        <article class="card share-card"><header class="card-head"><span class="chip-ico">${icon('share')}</span><div><h2 class="h2">Fais découvrir Kin Fit</h2><p class="muted">Gratuit, sans publicité</p></div></header>
+          <p>${CLOUD.linked ? 'Envoie le lien de l’app : ton ami pourra t’ajouter en un geste après avoir créé son compte.' : 'Envoie le lien de l’app à tes proches pour vous lancer des défis.'}</p>
+          <div class="actions"><button type="button" class="btn" data-act="share-app">${icon('share')}Partager l’app</button></div></article>
         ${aiSettingsCard(sess)}
         ${installCard()}
         <article class="card"><header class="card-head"><span class="chip-ico">${icon('user')}</span><div><h2 class="h2">Langue et pays</h2></div></header>
@@ -1606,6 +1628,7 @@
         <label class="choice"><input type="radio" name="petitdej" value="mixte"${p.petitdej === 'mixte' ? ' checked' : ''}><span><b>Sucré-salé</b><small>Œufs, pain, pomme, miel</small></span></label>
       </div><p class="hint">Les ingrédients sont remplacés automatiquement selon ton alimentation.</p></fieldset>
       <fieldset><legend>Ton budget courses</legend><div class="choices">${Object.entries(M.BUDGETS).map(([k, l]) => radio('budget', k, l, p.budget || 'moyen')).join('')}</div><p class="hint">Budget serré : les ingrédients chers sont remplacés par des équivalents économiques, de saison ou surgelés.</p></fieldset>
+      <fieldset><legend>Ton temps pour cuisiner</legend><div class="choices">${Object.entries(M.TEMPS).map(([k, l]) => radio('temps', k, l, p.temps || 'libre')).join('')}</div><p class="hint">Rapide : les plats de 20 minutes au plus passent en premier. S’il n’y en a pas assez pour ton régime, on complète avec des plats un peu plus longs.</p></fieldset>
       <fieldset><legend>Repas plaisir par semaine</legend><div class="choices">${[['0', 'Aucun'], ['1', 'Un'], ['2', 'Deux']].map(([k, l]) => radio('cheat', k, l, String(p.cheat ?? 1))).join('')}</div><p class="hint">Un cheat meal planifié aide à tenir sur la durée. Il remplace un dîner le samedi, et un déjeuner le mercredi si tu en choisis deux.</p></fieldset>`;
   }
 
@@ -1654,7 +1677,7 @@
     if (ui.ob.step === 1) { p.niveau = +fd.get('niveau'); p.seances = +(fd.get('seances') || 0); p.duree = +(fd.get('duree') || 60); p.materiel = fd.getAll('materiel'); p.restrictions = fd.get('restrictions') || ''; }
     if (ui.ob.step === 2) { p.sports = fd.getAll('sports'); p.autre = (fd.get('autre') || '').trim(); }
     if (ui.ob.step === 3) { p.regime = fd.get('regime') || 'omni'; p.pratiques = fd.getAll('pratiques'); p.eviter = fd.getAll('eviter'); }
-    if (ui.ob.step === 4) { p.petitdej = fd.get('petitdej') || ''; p.cheat = +(fd.get('cheat') ?? 1); p.budget = fd.get('budget') || 'moyen'; }
+    if (ui.ob.step === 4) { p.petitdej = fd.get('petitdej') || ''; p.cheat = +(fd.get('cheat') ?? 1); p.budget = fd.get('budget') || 'moyen'; p.temps = fd.get('temps') || 'libre'; }
   }
 
   function validate() {
@@ -1728,7 +1751,7 @@
     main.classList.toggle('printing', ui.printing);
     main.innerHTML = (views[ui.view] || viewToday)(sess);
     mark(ui.view);
-    if (ui.view === 'today' && sess && !ui.checkinAsked && !todayCheck(sess) && !state.pendingShare) { ui.checkinAsked = true; setTimeout(openCheckin, 700); }
+    if (ui.view === 'today' && sess && !ui.checkinAsked && !todayCheck(sess) && !state.pendingShare && !state.pendingFriend) { ui.checkinAsked = true; setTimeout(openCheckin, 700); }
     renderRail(sess);
     const chat = $('#chat'); if (chat) chat.scrollTop = chat.scrollHeight;
   }
@@ -1777,6 +1800,13 @@
       const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
       let ok = false; try { ok = document.execCommand('copy'); } catch (e2) { ok = false; } ta.remove(); return ok;
     }
+  }
+
+  async function shareApp() {
+    const url = inviteLink(); const ps = myPseudo();
+    const text = ps ? `Je m’entraîne avec Kin Fit : programme sportif, menus et défis entre amis. Rejoins-moi, mon pseudo est ${ps}.` : 'Je m’entraîne avec Kin Fit : programme sportif, menus et défis entre amis. Rejoins-moi !';
+    if (navigator.share) { try { await navigator.share({ title: 'Kin Fit', text, url }); return 'partagé'; } catch (e) { if (e && e.name === 'AbortError') return ''; } }
+    return (await copyText(url)) ? 'copié' : '';
   }
 
   async function shareItem(item, sess) {
@@ -1908,6 +1938,14 @@
       state.pendingShare = null; save(); ui.defisTab = 'amis'; go('defis'); toast('Défi relevé. À toi de jouer !'); return;
     }
     if (a === 'share-later') { state.pendingShare = null; save(); render(); return; }
+    if (a === 'share-app') { const r = await shareApp(); if (r) toast(r === 'copié' ? 'Lien copié. Envoie-le à qui tu veux.' : 'Merci de faire découvrir Kin Fit !'); return; }
+    if (a === 'invite-later') { state.pendingFriend = null; save(); render(); return; }
+    if (a === 'invite-accept') {
+      const p = state.pendingFriend; if (!p) return;
+      try { const f = await CLOUD.requestFriend(p); state.pendingFriend = null; save(); await refreshSocial(); ui.defisTab = 'amis'; go('defis'); toast(`Demande envoyée à ${f.pseudo}.`); }
+      catch (err) { if (err && /23505|duplicate/i.test(`${err.cause && err.cause.code} ${err.detail}`)) { state.pendingFriend = null; save(); render(); toast('Vous êtes déjà en lien.'); } else toast(cloudErr(err)); }
+      return;
+    }
     if (a === 'login-google') { try { await CLOUD.signInGoogle(); } catch (err) { toast(cloudErr(err)); } return; }
     if (a === 'logout') { await CLOUD.signOut().catch(() => {}); ui.friends = null; render(); toast('Déconnecté. Tes données restent sur cet appareil.'); return; }
     if (a === 'sync-now') { await cloudPush(true); await refreshSocial(); render(); toast('Progression synchronisée.'); return; }

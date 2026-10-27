@@ -28,6 +28,15 @@
   /* Strings added after the bulk translation (welcome, budget, regions, alternatives, patterns' words). */
   const EXTRA = {
     'Bienvenue': ['Welcome', 'Bienvenido'],
+    'Fais découvrir Kin Fit': ['Tell your friends about Kin Fit', 'Da a conocer Kin Fit'], 'Gratuit, sans publicité': ['Free, no ads', 'Gratis, sin publicidad'],
+    'Partager l’app': ['Share the app', 'Compartir la app'], 'Inviter par lien': ['Invite by link', 'Invitar con un enlace'],
+    'Envoie le lien de l’app : ton ami pourra t’ajouter en un geste après avoir créé son compte.': ['Send the app link: your friend can add you in one tap once they have an account.', 'Envía el enlace de la app: tu amigo podrá añadirte con un toque cuando cree su cuenta.'],
+    'Envoie le lien de l’app à tes proches pour vous lancer des défis.': ['Send the app link to your friends and family to challenge each other.', 'Envía el enlace de la app a los tuyos para lanzaros retos.'],
+    'Merci de faire découvrir Kin Fit !': ['Thanks for spreading the word about Kin Fit!', '¡Gracias por dar a conocer Kin Fit!'],
+    'Je m’entraîne avec Kin Fit : programme sportif, menus et défis entre amis. Rejoins-moi !': ['I train with Kin Fit: workout plan, menus and challenges with friends. Join me!', 'Entreno con Kin Fit: programa deportivo, menús y retos entre amigos. ¡Únete!'],
+    't’invite à devenir amis sur Kin Fit.': ['invites you to be friends on Kin Fit.', 'te invita a ser amigos en Kin Fit.'],
+    't’invite sur Kin Fit. Crée ton compte gratuit pour devenir amis et vous lancer des défis.': ['invites you to Kin Fit. Create your free account to become friends and challenge each other.', 'te invita a Kin Fit. Crea tu cuenta gratuita para ser amigos y lanzaros retos.'],
+    'Ajouter en ami': ['Add as friend', 'Añadir como amigo'], 'Vous êtes déjà en lien.': ['You are already connected.', 'Ya estáis conectados.'],
     "Kin Fit Plus": ["Kin Fit Plus", "Kin Fit Plus"],
     "Coach IA qui répond à tes questions": ["AI coach that answers your questions", "Coach IA que responde a tus preguntas"],
     "Compteur de calories en photo": ["Photo calorie counter", "Contador de calorías con foto"],
@@ -622,6 +631,7 @@
     [/^Ton pseudo : (.+)$/, (m) => pick(`Your username: ${m[1]}`, `Tu seudónimo: ${m[1]}`)],
     [/^En attente de réponse : (.+)$/, (m) => pick(`Waiting for: ${m[1]}`, `Esperando respuesta: ${m[1]}`)],
     [/^Lien envoyé à (.+)\. Ouvre-le sur cet appareil pour te connecter \(pense à regarder les indésirables\)\.$/, (m) => pick(`Link sent to ${m[1]}. Open it on this device to sign in (check your spam folder).`, `Enlace enviado a ${m[1]}. Ábrelo en este dispositivo para conectarte (revisa el correo no deseado).`)],
+    [/^Je m’entraîne avec Kin Fit : programme sportif, menus et défis entre amis\. Rejoins-moi, mon pseudo est (.+)\.$/, (m) => pick(`I train with Kin Fit: workout plan, menus and challenges with friends. Join me, my username is ${m[1]}.`, `Entreno con Kin Fit: programa deportivo, menús y retos entre amigos. Únete, mi seudónimo es ${m[1]}.`)],
     [/^Demande envoyée à (.+)\.$/, (m) => pick(`Request sent to ${m[1]}.`, `Solicitud enviada a ${m[1]}.`)],
     [/^Compte (.+) créé\. Ta progression est sauvegardée\.$/, (m) => pick(`Account ${m[1]} created. Your progress is backed up.`, `Cuenta ${m[1]} creada. Tu progreso está guardado.`)],
     [/^Progression de (.+) récupérée\.$/, (m) => pick(`${m[1]}’s progress restored.`, `Progreso de ${m[1]} recuperado.`)],

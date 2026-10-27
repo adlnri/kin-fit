@@ -183,7 +183,7 @@
     const sx = meatSuffix(p);
     const sw = swap(d, f, p, sx);
     return {
-      id: d.id, cheat, why: d.why,
+      id: d.id, cheat, why: d.why, min: minOf(d),
       n: (d.n || d.ing[0][0]) + (sw.tag ? ` · ${sw.tag}` : ''),
       k: Math.round(d.k * f), p: Math.round(d.p * f), g: Math.round(d.g * f), l: Math.round(d.l * f),
       ...sw,
@@ -201,12 +201,21 @@
   };
   DISHES.forEach((d) => { d.n = NAMES[d.id]; });
 
+  // Cooking-time preference: keep dishes within the limit, widening it when too few remain for the diet.
+  const TEMPS = { rapide: 'Rapide (20 min max)', normal: 'Normal (35 min max)', libre: 'Peu importe' };
+  const minOf = (d) => { const r = window.NA_RECIPES && window.NA_RECIPES.get(d.id); return r ? r.min : 30; };
+  function byTime(list, p) {
+    const lims = p.temps === 'rapide' ? [20, 35] : p.temps === 'normal' ? [35] : [];
+    for (const lim of lims) { const f = list.filter((d) => minOf(d) <= lim); if (f.length >= 3) return f; }
+    return list;
+  }
+
   const pick = (arr, i) => (arr.length ? arr[((i % arr.length) + arr.length) % arr.length] : null);
 
   function dayMeals(p, seed, dayIdx, weekNo, trainingDay) {
     const f = forbidden(p);
     const plats = DISHES.filter((d) => d.t === 'plat' && allowed(d, f, p));
-    const dejs = plats.filter((d) => d.when !== 'diner'); const dins = plats.filter((d) => d.when !== 'dej');
+    const dejs = byTime(plats.filter((d) => d.when !== 'diner'), p); const dins = byTime(plats.filter((d) => d.when !== 'dej'), p);
     const cheats = DISHES.filter((d) => d.t === 'cheat' && allowed(d, f, p));
     let dej = pick(dejs, dayIdx * 3 + seed + weekNo);
     let din = pick(dins, dayIdx * 3 + seed * 5 + weekNo + 1);
@@ -228,5 +237,5 @@
 
   const BUDGETS = { serre: 'Serré', moyen: 'Moyen', confort: 'Confort' };
   const REGIONS = { eu: 'Europe', maghreb: 'Maghreb', afrique: 'Afrique de l’Ouest et centrale', na: 'Amérique du Nord', latam: 'Amérique latine' };
-  window.NA_MEALS = { ALLERGENES, REGIMES, PRATIQUES, BUDGETS, REGIONS, forbidden, summary, meatSuffix, dayMeals, breakfastAlts, CHEAT_TIP, DISHES };
+  window.NA_MEALS = { ALLERGENES, REGIMES, PRATIQUES, BUDGETS, REGIONS, TEMPS, forbidden, summary, meatSuffix, dayMeals, breakfastAlts, CHEAT_TIP, DISHES };
 })();
