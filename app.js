@@ -13,7 +13,7 @@
   /* ---------- Icons: one 24px grid, 2px round stroke ---------- */
 
   const P = {
-    play: 'M8 5v14l11-7z', pause: 'M8 5v14M16 5v14', prev: 'M18 6l-8 6 8 6M6 6v12', next: 'M6 6l8 6-8 6M18 6v12', sound: 'M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12',
+    camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z', play: 'M8 5v14l11-7z', pause: 'M8 5v14M16 5v14', prev: 'M18 6l-8 6 8 6M6 6v12', next: 'M6 6l8 6-8 6M18 6v12', sound: 'M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12',
     dumbbell: 'M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12',
     heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
     bowl: 'M3 11h18a9 9 0 0 1-18 0zM9 11c0-2.5 1.5-4.5 3.5-5.5M15 7.5c.8.9 1.3 2.1 1.3 3.5',
@@ -980,10 +980,13 @@
     const p = sess.profile; const it = buildPlan(dayView(sess, todayIdx)).byDay(todayIdx); const L0 = lg(sess, iso(TODAY)); const eat = L0.eat || {};
     const b = breakfast(p, it ? 1.08 : 0.95); const m = mealsFor(sess, todayIdx);
     const rows = [['pdj', 'Petit-déjeuner', b.tot.k, !!L0.pdj], ['dej', 'Déjeuner', m.dej ? m.dej.k : 0, !!eat.dej], ['diner', 'Dîner', m.diner ? m.diner.k : 0, !!eat.diner], ['snack', 'Collation', Math.round(m.kcal * 0.1), !!eat.snack]];
+    (L0.photos || []).forEach((x) => { const r = rows.find((y) => y[0] === x.slot); if (r) { r[2] = x.kcal; r[3] = true; r[4] = x.plat; } else rows.push(['extra', 'Extra', x.kcal, true, x.plat]); });
     const got = rows.reduce((t, r) => t + (r[3] ? r[2] : 0), 0); const C = 2 * Math.PI * 52; const f = Math.min(1, got / (m.kcal || 1));
     return `<article class="card food-day"><header class="card-head"><span class="chip-ico">${icon('flame')}</span><div><h2 class="h2">Ta journée</h2><p class="muted">${it ? 'Jour d’entraînement' : 'Jour de repos'} · besoin estimé ${m.kcal} kcal</p></div></header>
       <div class="food-top"><div class="hero-ring food-ring" role="img" aria-label="${got} kcal sur ${m.kcal}"><svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="food-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e3a1"/><stop offset=".45" stop-color="#d4af37"/><stop offset="1" stop-color="#8a6416"/></linearGradient></defs><circle class="ring-track" cx="60" cy="60" r="52"/><circle class="ring-val" cx="60" cy="60" r="52" stroke="url(#food-gold)" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - f)).toFixed(1)}"/></svg><p><b>${got}</b><span>sur ${m.kcal} kcal</span></p></div>
-        <ul class="food-rows">${rows.map(([k, n, kc, ok]) => `<li class="${ok ? 'is-on' : ''}"><span><b>${n}</b><small>≈ ${kc} kcal</small></span><span class="food-acts">${k === 'dej' || k === 'diner' ? `${recipeBtn(m[k], 'link-btn')}<button type="button" class="link-btn" data-swap="${k}">Autre idée</button>` : ''}<button type="button" class="btn btn--${ok ? 'done' : 'cat'}" data-eat="${k}" aria-pressed="${ok}">${ok ? icon('check') + 'Mangé' : 'J’ai mangé ça'}</button></span></li>`).join('')}</ul></div>
+        <ul class="food-rows">${rows.map(([k, n, kc, ok, ph]) => k === 'extra' ? `<li class="is-on"><span><b>${n}</b><small>${icon('camera')} <span data-no-i18n>${esc(ph)}</span> · ${kc} kcal</small></span></li>` : `<li class="${ok ? 'is-on' : ''}"><span><b>${n}</b><small>${ph ? `${icon('camera')} <span data-no-i18n>${esc(ph)}</span> · ` : '≈ '}${kc} kcal</small></span><span class="food-acts">${k === 'dej' || k === 'diner' ? `${recipeBtn(m[k], 'link-btn')}<button type="button" class="link-btn" data-swap="${k}">Autre idée</button>` : ''}<button type="button" class="btn btn--${ok ? 'done' : 'cat'}" data-eat="${k}" aria-pressed="${ok}">${ok ? icon('check') + 'Mangé' : 'J’ai mangé ça'}</button></span></li>`).join('')}</ul></div>
+      <div class="meal-photo"><button type="button" class="btn btn--big btn--sheen" data-act="meal-photo">${icon('camera')}Photographier mon repas</button>${CLOUD.plus ? '' : '<span class="tag tag--plus">Plus</span>'}
+        <input type="file" id="meal-file" accept="image/*" capture="environment" hidden></div>
     </article>`;
   }
 
@@ -1186,64 +1189,68 @@
   /* ---------- Coach IA settings (per device) ---------- */
 
   const AI_ERR = {
-    bad_key: 'Google refuse cette clé. Vérifie que tu l’as copiée en entier, sans espace.',
-    forbidden: 'Google refuse l’accès avec cette clé : région, facturation ou projet non autorisé. Vérifie ton compte sur Google AI Studio.',
-    rate_limited: 'Quota gratuit atteint pour le moment. Réessaie dans quelques minutes.',
-    model: 'Le modèle Gemini prévu n’est pas disponible pour cette clé.',
-    network: 'Pas de connexion à Google. Vérifie ta connexion Internet.',
-    timeout: 'Google met trop de temps à répondre. Réessaie.',
+    not_plus: 'Cette fonction fait partie de Kin Fit Plus.',
+    signed_out: 'Connecte-toi à ton compte Kin Fit pour utiliser Plus.',
+    daily_limit: 'Tu as atteint la limite d’IA du jour. Elle revient demain.',
+    rate_limited: 'Le coach est très demandé en ce moment. Réessaie dans une minute.',
+    too_large: 'La photo est trop lourde. Réessaie avec une autre photo.',
+    network: 'Pas de connexion. Vérifie ta connexion Internet.',
+    timeout: 'Le coach met trop de temps à répondre. Réessaie.',
     webgpu: 'Ton navigateur ne permet pas encore l’IA sur l’appareil (WebGPU indisponible). Essaie Chrome ou Edge récents.',
     local: 'Le téléchargement du modèle a échoué. Vérifie ta connexion et l’espace libre, puis réessaie.',
   };
   const aiErr = (e) => AI_ERR[e && e.code] || 'Ça n’a pas marché. Réessaie dans un moment.';
   const localProgress = (r) => `Chargement du modèle sur ton appareil : ${Math.round((r.progress || 0) * 100)} %`;
 
-  // Checks the key format, then asks Google once before saving it on this device.
-  function connectGemini(raw, btn) {
-    const st = $('#gemini-status'); const m = String(raw || '').match(/AIza[0-9A-Za-z_-]{30,}/);
-    if (!m) { st.textContent = raw && raw.trim() ? 'Ce n’est pas une clé Gemini : elle doit commencer par AIza. Recopie-la depuis Google AI Studio.' : 'Colle d’abord ta clé Gemini.'; return; }
-    const key = m[0]; st.textContent = 'Vérification de la clé auprès de Google…'; if (btn) btn.disabled = true;
-    AI.testGemini(key)
-      .then(() => { AI.setConfig({ provider: 'gemini', key }); ui.aiPick = 'gemini'; ui.geminiBack = false; render(); toast('Gemini est connecté.'); })
-      .catch((err) => { if (btn) btn.disabled = false; st.textContent = aiErr(err); });
+  // Kin Fit Plus: the paid subscription that unlocks the AI (coach, meal photos, AI programmes and menus).
+  function plusLink(kind) {
+    const base = CLOUD.plusLinks[kind]; if (!base || !CLOUD.user) return '';
+    const q = new URLSearchParams({ client_reference_id: CLOUD.user.id }); if (CLOUD.user.email) q.set('prefilled_email', CLOUD.user.email);
+    return `${base}${base.includes('?') ? '&' : '?'}${q}`;
+  }
+  function plusCard() {
+    if (!CLOUD.enabled) return '';
+    const perks = ['Coach IA qui répond à tes questions', 'Compteur de calories en photo', 'Programme et menus réécrits par l’IA', 'Nouveautés Plus en avant-première'];
+    let body;
+    if (CLOUD.plus) {
+      const until = CLOUD.plusUntil ? new Date(CLOUD.plusUntil).toLocaleDateString(window.NA_I18N.locale, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+      const portal = CLOUD.plusLinks.portal;
+      body = `<p class="plus-on">${icon('check')}<span>Tu es <b>Kin Fit Plus</b>${until ? ` · renouvellement ou fin le ${until}` : ''}.</span></p>
+        ${portal ? `<div class="actions"><a class="btn btn--ghost" href="${portal}${CLOUD.user && CLOUD.user.email ? `?prefilled_email=${encodeURIComponent(CLOUD.user.email)}` : ''}" target="_blank" rel="noopener">Gérer ou résilier mon abonnement</a></div>` : ''}`;
+    } else if (!CLOUD.linked) {
+      body = `<p>Crée d’abord ton compte Kin Fit gratuit ci-dessous : l’abonnement s’y rattache.</p>`;
+    } else if (!CLOUD.plusLinks.monthly && !CLOUD.plusLinks.yearly) {
+      body = '<p class="hint">L’abonnement arrive très bientôt.</p>';
+    } else {
+      body = `<div class="plus-offers">
+          ${CLOUD.plusLinks.monthly ? `<a class="plus-offer" href="${plusLink('monthly')}" target="_blank" rel="noopener"><b>2,99 €</b><span>par mois</span><small>Sans engagement</small></a>` : ''}
+          ${CLOUD.plusLinks.yearly ? `<a class="plus-offer plus-offer--best" href="${plusLink('yearly')}" target="_blank" rel="noopener"><i>−30 %</i><b>24,99 €</b><span>par an</span><small>Soit 2,08 € par mois</small></a>` : ''}
+        </div>
+        <p class="hint">Paiement sécurisé par Stripe. Résiliable à tout moment, l’accès dure jusqu’à la fin de la période payée. En t’abonnant, tu acceptes les <a href="cgv.html" target="_blank" rel="noopener">conditions générales de vente</a> et tu demandes l’accès immédiat à Plus.</p>
+        <div class="actions"><button type="button" class="btn btn--ghost" data-act="plus-refresh">J’ai payé : activer Plus</button></div>`;
+    }
+    return `<article class="card plus-card" id="plus-card"><header class="card-head"><span class="chip-ico">${icon('star')}</span><div><h2 class="h2">Kin Fit Plus</h2><p class="muted">${CLOUD.plus ? 'Actif' : 'L’IA au service de ton programme'}</p></div></header>
+      <ul class="save-perks">${perks.map((x) => `<li>${icon('check')}${x}</li>`).join('')}</ul>${body}</article>`;
   }
 
   function aiSettingsCard(sess) {
     const c = AI.config; const cur0 = AI.provider;
-    const pick = ui.aiPick || (c.provider && c.provider !== 'server' ? c.provider : cur0);
-    const minor = +sess.profile.age < 18;
+    const pick = ui.aiPick || (c.provider === 'local' || c.provider === 'none' ? c.provider : cur0 === 'none' ? 'plus' : cur0);
     const opt = (v, title, desc, dis) => `<label class="choice choice--block"><input type="radio" name="aiprov" value="${v}"${pick === v ? ' checked' : ''}${dis ? ' disabled' : ''}><span><b>${title}</b><small>${desc}</small></span></label>`;
-    const now = { none: 'sans IA, exemples de l’app', gemini: 'Gemini, avec ta clé', local: 'IA sur ton appareil (coach)', server: 'serveur Kin Fit' }[cur0];
-    const gemini = `<form id="gemini-form" class="ai-block" novalidate>
-        ${cur0 === 'gemini' ? '' : `<ol class="wizard">
-          <li><span class="wz-n">1</span><div><b>Ouvre Google AI Studio</b><p class="hint">Connecte-toi avec ton compte Google et accepte les conditions la première fois, puis touche « Create API key ».</p><a class="btn btn--glass" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" data-act="gemini-open">${icon('link')}Ouvrir Google AI Studio</a></div></li>
-          <li><span class="wz-n">2</span><div><b>Copie ta clé</b><p class="hint">Elle commence par AIza. Touche l’icône de copie à côté de la clé.</p></div></li>
-          <li><span class="wz-n">3</span><div><b>Reviens ici et colle-la</b><p class="hint">Kin Fit la lit, vérifie qu’elle marche et se connecte.</p><button type="button" class="btn btn--big btn--sheen${ui.geminiBack ? ' is-ready' : ''}" data-act="gemini-paste">Coller et connecter</button></div></li>
-        </ol>`}
-        <details class="gemini-manual"${cur0 === 'gemini' ? ' open' : ''}><summary>${cur0 === 'gemini' ? 'Changer de clé' : 'Coller la clé à la main'}</summary>
-          <div class="field"><label for="gemini-key">Ta clé Gemini</label><input class="input" id="gemini-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${c.key ? 'Clé enregistrée sur cet appareil' : 'AIza…'}"></div>
-          <div class="actions"><button type="submit" class="btn">Connecter</button>${c.key ? '<button type="button" class="btn btn--ghost" data-act="gemini-forget">Retirer la clé</button>' : ''}</div>
-        </details>
-        <p class="hint ai-status" id="gemini-status" role="status">${cur0 === 'gemini' ? 'Gemini est connecté sur cet appareil.' : ''}</p>
-        <div class="note ai-terms"><p><b>À savoir avant de connecter.</b> Ton profil (âge, taille, poids, objectif, sport, restrictions, alimentation) part directement de ton appareil vers Google, avec ta clé. Kin Fit ne voit ni ta clé ni les réponses.</p>
-          <p>Avec l’offre gratuite, Google peut utiliser ces échanges pour améliorer ses services et les faire relire par des personnes : n’écris pas de détails médicaux.</p>
-          <p>Google réserve son API aux 18 ans et plus. Dans l’Union européenne, au Royaume-Uni et en Suisse, il demande un compte Google avec facturation activée pour ce type d’usage : l’éventuel coût est alors facturé sur ton compte Google, jamais par Kin Fit.</p>
-          <p>La clé reste enregistrée sur cet appareil. Sur un appareil partagé, retire-la après usage.</p></div>
-      </form>`;
+    const now = { none: 'sans IA, exemples de l’app', plus: 'Kin Fit Plus', local: 'IA sur ton appareil (coach)', server: 'serveur Kin Fit' }[cur0];
     const local = !AI.webgpu ? `<p class="note">${AI_ERR.webgpu}</p>`
       : `<div class="ai-block"><p>Modèle open source Qwen 2.5 (1,5 milliard de paramètres) qui tourne dans ton navigateur. Il répond aux questions du coach ; programmes et repas restent ceux de l’app.</p>
         ${c.local ? `<p class="hint ai-status">${cur0 === 'local' ? 'Le modèle est téléchargé et actif sur cet appareil.' : 'Le modèle est déjà téléchargé.'}</p>${cur0 === 'local' ? '' : '<div class="actions"><button type="button" class="btn" data-act="local-use">Utiliser l’IA sur l’appareil</button></div>'}`
         : `<div class="actions"><button type="button" class="btn" data-act="local-load">Télécharger le modèle (environ 1 Go)</button></div>`}
         <div class="ai-progress" id="local-progress" hidden><progress max="1" value="0"></progress><p class="hint" id="local-status" role="status"></p></div>
-        <p class="hint">Rien ne quitte ton appareil. Wi-Fi conseillé pour le premier téléchargement, ensuite ça marche hors connexion. Les réponses sont plus simples qu’avec Gemini et peuvent être lentes sur un téléphone ancien.</p></div>`;
+        <p class="hint">Rien ne quitte ton appareil. Wi-Fi conseillé pour le premier téléchargement, ensuite ça marche hors connexion. Les réponses sont plus simples qu’avec Plus et peuvent être lentes sur un téléphone ancien.</p></div>`;
     return `<article class="card ai-card"><header class="card-head"><span class="chip-ico">${icon('star')}</span><div><h2 class="h2">Coach IA</h2><p class="muted">Sur cet appareil : ${now}</p></div></header>
       <fieldset><legend class="sr-only">Source de l’IA</legend><div class="choices choices--stack">
+        ${CLOUD.enabled ? opt('plus', 'Kin Fit Plus', CLOUD.plus ? 'Coach, photos de repas, programmes et menus par l’IA. Actif sur ton compte.' : 'Coach, photos de repas, programmes et menus par l’IA, avec l’abonnement Plus.') : ''}
+        ${opt('local', 'IA sur ton appareil (gratuit)', 'Le coach répond sans rien envoyer sur Internet. Premier téléchargement d’environ 1 Go.', false)}
         ${opt('none', 'Sans IA', 'Programmes, repas et coach d’exemple, calculés dans ton navigateur. Gratuit et hors connexion.')}
-        ${opt('gemini', 'Gemini, avec ta clé Google', minor ? 'Réservé aux 18 ans et plus par Google.' : 'Programmes, repas et coach écrits par Gemini, avec ta propre clé créée sur Google AI Studio.', minor)}
-        ${opt('local', 'IA sur ton appareil', 'Le coach répond sans rien envoyer sur Internet. Premier téléchargement d’environ 1 Go.', false)}
-        ${AI.serverReady ? opt('server', 'Serveur Kin Fit', 'L’IA du site Kin Fit, si elle est activée.', false) : ''}
       </div></fieldset>
-      ${pick === 'gemini' && !minor ? gemini : ''}${pick === 'local' ? local : ''}
+      ${pick === 'local' ? local : ''}${pick === 'plus' && !CLOUD.plus ? '<p class="hint">Abonne-toi dans la carte Kin Fit Plus ci-dessus.</p>' : ''}
     </article>`;
   }
 
@@ -1254,6 +1261,7 @@
         <article class="card"><header class="card-head"><span class="chip-ico">${icon('user')}</span><div><h2 class="h2">Mon profil</h2></div></header>${profileFacts(p, false)}
           <p><b>Petit-déjeuner :</b> ${PDJ[p.petitdej]}. <b>Alimentation :</b> ${esc(M.summary(p))}. <b>À éviter :</b> ${p.eviter.length ? esc(p.eviter.map((a) => ALLERG[a]).join(', ')) : 'rien de signalé'}. <b>Restrictions :</b> ${p.restrictions.trim() ? esc(p.restrictions) : 'aucune'}.</p>
           <div class="actions"><button type="button" class="btn" data-act="edit">Modifier mon profil</button><button type="button" class="btn btn--ghost" data-act="new">Nouvelle session</button></div></article>
+        ${plusCard()}
         ${accountCard(sess)}
         ${aiSettingsCard(sess)}
         ${installCard()}
@@ -1331,6 +1339,60 @@
     document.body.appendChild(dlg);
     dlg.addEventListener('close', () => dlg.remove());
     dlg.showModal();
+  }
+
+  /* ---------- Meal photo calorie counter (Kin Fit Plus) ---------- */
+
+  // A phone photo shrunk to 1024 px JPEG, as base64 without the data: prefix.
+  function shrinkPhoto(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file); const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 1024 / Math.max(img.width, img.height)); const cv = document.createElement('canvas');
+        cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
+        const data = cv.toDataURL('image/jpeg', 0.8); resolve({ data, b64: data.split(',')[1] });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+      img.src = url;
+    });
+  }
+
+  let mealShot = null;
+  async function analyseMeal(file) {
+    const sess = cur(); if (!sess || !file) return;
+    const old = $('#meal'); if (old) old.remove();
+    const dlg = document.createElement('dialog'); dlg.id = 'meal'; dlg.className = 'dlg dlg--full meal-dlg'; dlg.setAttribute('aria-labelledby', 'meal-title');
+    dlg.innerHTML = `<div class="dlg-body"><header class="dlg-head"><div><p class="label">Kin Fit Plus</p><h2 class="h2" id="meal-title">Ton repas</h2></div><button type="button" class="round" data-act="meal-close" aria-label="Fermer">${icon('x')}</button></header>
+      <div class="meal-body"><p class="hint" role="status">Analyse de la photo…</p></div></div>`;
+    document.body.appendChild(dlg); dlg.addEventListener('close', () => { dlg.remove(); mealShot = null; }); dlg.showModal();
+    const body = dlg.querySelector('.meal-body');
+    try {
+      const shot = await shrinkPhoto(file);
+      body.innerHTML = `<img class="meal-shot" src="${shot.data}" alt=""><p class="hint" role="status">Analyse de la photo… quelques secondes.</p>`;
+      const r = await AI.mealPhoto(shot.b64, NA.OBJECTIFS[sess.profile.objectif]);
+      const t = r.total || {}; const kc = Math.round(t.kcal || 0);
+      mealShot = { plat: r.plat || 'Repas', kcal: kc, p: Math.round(t.proteines_g || 0), g: Math.round(t.glucides_g || 0), l: Math.round(t.lipides_g || 0) };
+      const conf = { faible: 'faible', moyenne: 'moyenne', haute: 'bonne' }[r.confiance] || 'moyenne';
+      body.innerHTML = `<img class="meal-shot" src="${shot.data}" alt="">
+        <h3 class="h3" data-no-i18n>${esc(mealShot.plat)}</h3>
+        <dl class="macros"><div class="m-k"><dt>Calories</dt><dd>${kc}<small> kcal</small></dd></div><div class="m-p"><dt>Protéines</dt><dd>${mealShot.p}<small> g</small></dd></div><div class="m-g"><dt>Glucides</dt><dd>${mealShot.g}<small> g</small></dd></div><div class="m-l"><dt>Lipides</dt><dd>${mealShot.l}<small> g</small></dd></div></dl>
+        ${(r.aliments || []).length ? `<ul class="ingr" data-no-i18n>${r.aliments.map((x) => `<li><span>${esc(x.nom)} · ${Math.round(x.quantite_g || 0)} g</span><b>${Math.round(x.kcal || 0)} kcal</b></li>`).join('')}</ul>` : ''}
+        ${r.conseil ? `<p class="note" data-no-i18n>${esc(r.conseil)}</p>` : ''}
+        <p class="hint">Estimation à partir de la photo, fiabilité ${conf}. Les portions réelles peuvent varier.</p>
+        ${kc ? `<p class="label">Ajouter à ma journée comme</p><div class="seg meal-slots">${[['pdj', 'Petit-déjeuner'], ['dej', 'Déjeuner'], ['diner', 'Dîner'], ['snack', 'Collation'], ['extra', 'Extra']].map(([k, l]) => `<button type="button" data-mslot="${k}">${l}</button>`).join('')}</div>` : ''}`;
+    } catch (err) {
+      body.innerHTML = `<p class="note">${esc(aiErr(err))}</p>${err.code === 'not_plus' ? '<div class="actions"><button type="button" class="btn" data-act="ai-setup">Découvrir Kin Fit Plus</button></div>' : ''}`;
+    }
+  }
+
+  function fileMeal(slot) {
+    const sess = cur(); if (!sess || !mealShot) return;
+    const L0e = lg(sess, iso(TODAY)); L0e.photos = (L0e.photos || []).filter((x) => slot === 'extra' || x.slot !== slot);
+    L0e.photos.push({ at: new Date().toISOString(), slot, ...mealShot });
+    if (slot === 'pdj') L0e.pdj = true; else if (slot !== 'extra') { L0e.eat = L0e.eat || {}; L0e.eat[slot] = true; }
+    const d = $('#meal'); if (d) d.close();
+    settle(sess); render(); toast('Repas ajouté à ta journée.');
   }
 
   /* ---------- Explainer video: the photos in motion, captions and a voice, built from the exercise sheet ---------- */
@@ -1724,7 +1786,6 @@
     return (await copyText(url)) ? 'copié' : '';
   }
 
-  document.addEventListener('click', (e) => { if (e.target.closest('[data-act="gemini-open"]')) ui.geminiAway = true; });
   document.addEventListener('click', async (e) => {
     const t = e.target.closest('button'); if (!t) return;
     const sess = cur();
@@ -1783,6 +1844,7 @@
     if (t.dataset.exo) return openExo(t.dataset.exo);
     if (t.dataset.recipe) return openRecipe(t.dataset.recipe);
     if (t.dataset.video) return openVideo(t.dataset.video, t.dataset.vkit);
+    if (t.dataset.mslot) return fileMeal(t.dataset.mslot);
     if (t.dataset.rstep) { const on = t.getAttribute('aria-pressed') !== 'true'; t.setAttribute('aria-pressed', String(on)); if (on && navigator.vibrate) navigator.vibrate(15); return; }
     if (t.dataset.faccept) { try { await CLOUD.acceptFriend(+t.dataset.faccept); toast('Ami ajouté.'); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
     if (t.dataset.fremove) { try { await CLOUD.removeFriend(+t.dataset.fremove); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
@@ -1865,16 +1927,7 @@
       catch (err) { toast(cloudErr(err)); }
       return;
     }
-    if (a === 'gemini-paste') {
-      let text = '';
-      try { text = await navigator.clipboard.readText(); } catch (err) { text = ''; }
-      if (text) return connectGemini(text, t);
-      const det = $('.gemini-manual'); if (det) det.open = true;
-      $('#gemini-status').textContent = 'Je n’ai pas pu lire le presse-papiers. Colle la clé dans le champ ci-dessous (appui long, puis Coller).';
-      const inp = $('#gemini-key'); if (inp) inp.focus();
-      return;
-    }
-    if (a === 'gemini-forget') { AI.setConfig({ provider: 'none', key: '' }); ui.aiPick = 'none'; render(); toast('Clé Gemini retirée de cet appareil.'); return refocus('input[name="aiprov"][value="none"]'); }
+    if (a === 'plus-refresh') { t.disabled = true; try { await CLOUD.pull(); render(); toast(CLOUD.plus ? 'Bienvenue dans Kin Fit Plus !' : 'Paiement pas encore reçu. Réessaie dans une minute.'); } catch (err) { t.disabled = false; toast(cloudErr(err)); } return; }
     if (a === 'local-use') { AI.setConfig({ provider: 'local' }); render(); toast('IA sur l’appareil activée pour le coach.'); return; }
     if (a === 'local-load') {
       const box = $('#local-progress'); const bar = box && box.querySelector('progress'); const st = $('#local-status');
@@ -1885,7 +1938,7 @@
       } catch (err) { t.disabled = false; if (st) st.textContent = aiErr(err); }
       return;
     }
-    if (a === 'ai-setup') { go('profil'); const c = $$('.ai-card').find((x) => x.querySelector('input[name="aiprov"]')); if (c) c.scrollIntoView({ block: 'start' }); return; }
+    if (a === 'ai-setup') { go('profil'); const c = $('#plus-card') || $$('.ai-card').find((x) => x.querySelector('input[name="aiprov"]')); if (c) c.scrollIntoView({ block: 'start' }); return; }
     if (a === 'checkin') return openCheckin();
     if (a === 'checkin-close') { const d = $('#checkin'); if (d) d.close(); return; }
     if (a === 'parcours') { ui.sportTab = 'parcours'; return go('sport'); }
@@ -1895,6 +1948,11 @@
     }
     if (a === 'save-later') { const s = cur(); if (s) { delete s.askSave; save(); } render(); window.scrollTo(0, 0); return; }
     if (a === 'exo-close') { const d = $('#exo'); if (d) d.close(); return; }
+    if (a === 'meal-photo') {
+      if (!CLOUD.plus) { toast('Le compteur photo fait partie de Kin Fit Plus.'); go('profil'); const c = $('#plus-card'); if (c) c.scrollIntoView({ block: 'start' }); return; }
+      const inp = $('#meal-file'); if (inp) { inp.value = ''; inp.click(); } return;
+    }
+    if (a === 'meal-close') { const d = $('#meal'); if (d) d.close(); return; }
     if (a === 'video-close') { const d = $('#video'); if (d) d.close(); return; }
     if (a === 'video-prev' && vid) return playScene(vid.i - 1);
     if (a === 'video-next' && vid) return playScene(vid.i + 1);
@@ -1963,10 +2021,11 @@
       if (e.target.checked) set.add(n); else set.delete(n);
       sess.shop[weekId] = [...set]; save(); render(); refocus(`[data-shop="${CSS.escape(n)}"]`); return;
     }
+    if (e.target.id === 'meal-file' && e.target.files && e.target.files[0]) { analyseMeal(e.target.files[0]); return; }
     if (e.target.matches('[data-level]')) save();
     if (e.target.name === 'aiprov') {
       const v = e.target.value; ui.aiPick = v;
-      if (v === 'none' || v === 'server') { AI.setConfig({ provider: v }); toast(v === 'none' ? 'Coach IA désactivé : l’app utilise ses exemples.' : 'Serveur Kin Fit sélectionné.'); }
+      if (v === 'none' || v === 'server' || v === 'plus') { AI.setConfig({ provider: v }); if (v === 'none') toast('Coach IA désactivé : l’app utilise ses exemples.'); }
       else if (v === 'local' && AI.config.local) AI.setConfig({ provider: 'local' });
       render(); return refocus(`input[name="aiprov"][value="${v}"]`);
     }
@@ -2014,10 +2073,6 @@
       CLOUD.requestFriend(p).then((f) => { st.textContent = `Demande envoyée à ${f.pseudo}.`; refreshSocial(); }).catch((err) => { st.textContent = cloudErr(err); });
       return;
     }
-    if (e.target.id === 'gemini-form') {
-      e.preventDefault(); connectGemini($('#gemini-key').value, e.target.querySelector('[type="submit"]'));
-      return;
-    }
     if (e.target.id === 'welcome-form' || e.target.id === 'prefs-form') {
       e.preventDefault(); const fd = new FormData(e.target); const country = fd.get('country');
       if (!country) { const er = $('#welcome-error'); if (er) er.textContent = 'Choisis ton pays pour continuer.'; return; }
@@ -2048,16 +2103,12 @@
   if (state.pendingShare && cur()) ui.view = 'defis';
   if (cur()) settle(cur(), true);
   render();
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && ui.geminiAway && AI.provider !== 'gemini') {
-      ui.geminiAway = false; ui.geminiBack = true;
-      if (ui.view === 'profil') { render(); const b = $('[data-act="gemini-paste"]'); if (b) b.scrollIntoView({ block: 'center' }); }
-      toast('Clé copiée ? Touche « Coller et connecter ».');
-    }
-  });
   if (CLOUD.enabled) {
     CLOUD.onChange(() => linkAccount());
-    CLOUD.start().then((ok) => { if (ok) linkAccount(); });
+    CLOUD.start().then((ok) => {
+      if (!ok) return; linkAccount();
+      if (/[?&]plus=ok/.test(location.search)) { history.replaceState(null, '', location.pathname); CLOUD.pull().then(() => { render(); toast(CLOUD.plus ? 'Bienvenue dans Kin Fit Plus !' : 'Paiement reçu : Plus s’active dans une minute.'); }).catch(() => {}); }
+    });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && CLOUD.linked) CLOUD.pull().then(() => linkAccount()).catch(() => {}); });
   }
   AI.ping.then((ok) => { if (ok && !ui.ob && !document.activeElement.matches('input, textarea, select')) render(); });

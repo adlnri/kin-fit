@@ -3,10 +3,9 @@
 **金 Kin Fit** — programme sportif et nutrition personnalisés, défis entre amis et médailles à gagner.
 Application web installable (PWA), en français, anglais et espagnol.
 
-> Sans réglage, l'app est gratuite et hors connexion : programmes, repas, parcours et coach sont calculés dans le navigateur.
-> Chaque utilisateur peut activer un coach IA dans **Profil › Coach IA**, sans aucun coût pour l'éditeur de l'app :
-> - **Gemini avec sa propre clé Google** (créée sur Google AI Studio) : programmes, repas et coach ; l'appel part directement de son appareil vers Google ;
-> - **IA sur l'appareil** (modèle open source Qwen 2.5, environ 1 Go téléchargé une fois, WebGPU) : réponses du coach, rien ne quitte l'appareil.
+> Sans réglage, l'app est gratuite et hors connexion : programmes, repas, parcours, exercices avec vidéo explicative et recettes sont calculés dans le navigateur.
+> L'IA est réservée à l'abonnement **Kin Fit Plus** (2,99 €/mois ou 24,99 €/an, sans essai) : coach, compteur de calories en photo, programmes et menus par l'IA. L'abonné paie, jamais l'éditeur pour les autres.
+> Gratuit aussi : **IA sur l'appareil** (modèle open source Qwen 2.5, environ 1 Go téléchargé une fois, WebGPU), pour le coach seulement, rien ne quitte l'appareil.
 >
 > Les données du profil restent sur l'appareil (localStorage). Aucune clé n'est jamais stockée dans le code.
 
@@ -43,7 +42,7 @@ Puis ouvrir <http://127.0.0.1:4180/>.
 | `stickers.js` | Dessins des médailles et écussons de rang (SVG) |
 | `i18n-data.js` | Traductions anglais / espagnol des textes de l'app |
 | `i18n.js` | Langue, pays, région et traduction en direct |
-| `ai.js` | Coach IA : Gemini (clé de l'utilisateur), IA sur l'appareil (WebLLM), serveur facultatif ; repli sur les exemples |
+| `ai.js` | Coach IA : Kin Fit Plus (Gemini via la fonction Supabase), IA sur l'appareil (WebLLM), serveur facultatif ; compteur photo ; repli sur les exemples |
 | `ai-core.mjs` | Prompts coach et nutrition, schémas des réponses, partagés par toutes les sources d'IA |
 | `app.js` | Interface : écrans, défis, trophées, partage, liste de courses, installation |
 | `netlify/functions/ai.mjs` | Option serveur `/api/ai` (Claude), inactive sans clé |
@@ -56,19 +55,33 @@ Puis ouvrir <http://127.0.0.1:4180/>.
 
 ## Publier
 
-- **GitHub Pages** (gratuit) : Settings → Pages → Deploy from branch → `main` / racine. Toute l'app marche, y compris Gemini et l'IA sur l'appareil, puisque ces deux options tournent dans le navigateur de l'utilisateur.
+- **GitHub Pages** (gratuit) : Settings → Pages → Deploy from branch → `main` / racine. Toute l'app marche ; Kin Fit Plus passe par les fonctions Supabase (voir plus bas).
 - **Netlify** (facultatif) : import du dépôt GitHub ; Netlify lit `netlify.toml` (build `npm run build`, dossier `dist`).
 
-### Coach IA : ce que l'utilisateur doit savoir (affiché dans l'app)
+### Kin Fit Plus : mise en route (à faire une fois par l'éditeur)
 
-- **Gemini** : conditions de Google pour l'API gratuite. Usage réservé aux 18 ans et plus (l'option est désactivée sous 18 ans). Avec l'offre gratuite, Google peut utiliser les échanges pour améliorer ses services et les faire relire par des personnes. Dans l'Union européenne, au Royaume-Uni et en Suisse, Google demande un compte avec facturation activée pour ce type d'usage : l'éventuel coût est facturé sur le compte Google de l'utilisateur, jamais à l'éditeur. La clé est enregistrée sur l'appareil (localStorage) et envoyée seulement à Google, dans un en-tête.
+L'abonnement finance l'IA : la clé Gemini **payante** de l'éditeur reste un secret Supabase, appelée seulement pour les abonnés, avec une limite par jour. Les conditions de Google interdisent l'offre gratuite de l'API pour une app ouverte aux utilisateurs de l'Union européenne.
+
+1. **Base** : Supabase › SQL Editor › exécuter `supabase/plus.sql` (statut d'abonnement, compteur d'usage, colonnes protégées).
+2. **Gemini** : sur Google AI Studio, créer une clé dans un projet Google Cloud **avec facturation activée**, puis dans Google Cloud › APIs › Generative Language API › Quotas, fixer un plafond de requêtes par jour (plafond de dépense).
+3. **Stripe** : créer le compte (statut d'entreprise et IBAN requis), un produit « Kin Fit Plus » avec deux prix récurrents (2,99 € par mois, 24,99 € par an), puis un **Payment Link** pour chacun. Dans chaque lien : après paiement, rediriger vers `https://<ton-site>/?plus=ok` ; activer la case d'acceptation des conditions (Settings › Public details › Terms of service = l'adresse de `cgv.html`). Activer le **portail client** (Settings › Billing › Customer portal) et copier son lien de connexion.
+4. **Fonctions** (Supabase CLI, ou éditeur de fonctions du tableau de bord) :
+   - `supabase functions deploy gemini --no-verify-jwt`
+   - `supabase functions deploy stripe-webhook --no-verify-jwt`
+   - secrets : `supabase secrets set GEMINI_API_KEY=… STRIPE_SECRET_KEY=… STRIPE_WEBHOOK_SECRET=…` (facultatif : `KINFIT_DAILY_LIMIT=60`). Ces clés ne vont **jamais** dans le code.
+5. **Webhook Stripe** : Developers › Webhooks › ajouter `https://<projet>.supabase.co/functions/v1/stripe-webhook` avec les événements `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` ; copier son secret de signature dans `STRIPE_WEBHOOK_SECRET`.
+6. **App** : coller les deux Payment Links et le lien du portail dans `config.js` (`plus: { monthly, yearly, portal }`), puis publier.
+7. **Légal** : compléter dans `cgv.html` le statut, le SIRET, l'adresse et le médiateur de la consommation.
+
+Tester d'abord en **mode test** Stripe (carte 4242 4242 4242 4242), puis passer en mode réel.
+
 - **IA sur l'appareil** : bibliothèque WebLLM 0.2.85 chargée depuis jsDelivr, modèle `Qwen2.5-1.5B-Instruct-q4f16_1-MLC`. Navigateur compatible WebGPU nécessaire (Chrome, Edge, Safari récents). Coach seulement : un si petit modèle n'écrit pas de programmes fiables.
 
 ### Option serveur (Claude, payante, désactivée par défaut)
 
 `netlify/functions/ai.mjs` peut appeler Claude d'Anthropic avec une clé de l'éditeur. **Rien ne se passe tant que la variable `ANTHROPIC_API_KEY` n'est pas définie dans Netlify**, et aucune clé n'existe aujourd'hui. Si un jour elle est activée, l'usage est facturé au propriétaire de la clé (voir console.anthropic.com, avec une limite de dépense). Variables facultatives : `KINFIT_MODEL_PLAN`, `KINFIT_MODEL_CHAT`, `KINFIT_EFFORT`, `KINFIT_RATE_LIMIT`, `ALLOWED_ORIGINS`.
 
-Les prompts coach et nutrition sont dans `ai-core.mjs`, partagés par Gemini, l'IA sur l'appareil et le serveur.
+Les prompts coach et nutrition sont dans `ai-core.mjs`, partagés par Kin Fit Plus (Gemini), l'IA sur l'appareil et le serveur.
 
 ## Mettre à jour
 

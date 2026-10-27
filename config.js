@@ -5,4 +5,6 @@ window.KINFIT_CLOUD = {
   url: 'https://jyyyyllchmrrgdrxegrg.supabase.co',  // Project URL
   key: 'sb_publishable_jnUV-cjPm58Yhz15TAHbNw_6MRo5Hb4',  // publishable key (public by design)
   google: false,    // true once Google sign-in is set up in Supabase › Authentication › Providers
+  // Kin Fit Plus: Stripe Payment Links (monthly, yearly) and the customer portal link. Empty = « bientôt disponible ».
+  plus: { monthly: '', yearly: '', portal: '' },
 };

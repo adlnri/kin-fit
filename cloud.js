@@ -30,7 +30,7 @@
 
   async function loadProfile() {
     if (!st.user) { st.profile = null; return null; }
-    const data = check(await st.sb.from('profiles').select('id, pseudo, consent_at, updated_at, state').eq('id', st.user.id).maybeSingle());
+    const data = check(await st.sb.from('profiles').select('id, pseudo, consent_at, updated_at, state, plan, plus_until').eq('id', st.user.id).maybeSingle());
     st.profile = data || null;
     return st.profile;
   }
@@ -72,7 +72,7 @@
   async function createProfile(pseudo, state) {
     const c = await sb(); if (!st.user) throw fail('signed_out');
     const row = { id: st.user.id, pseudo, consent_at: new Date().toISOString(), state: state || {}, updated_at: new Date().toISOString() };
-    st.profile = check(await c.from('profiles').insert(row).select('id, pseudo, consent_at, updated_at, state').single());
+    st.profile = check(await c.from('profiles').insert(row).select('id, pseudo, consent_at, updated_at, state, plan, plus_until').single());
     return st.profile;
   }
   async function push(state) {
@@ -115,8 +115,15 @@
   }
   async function deleteAccount() { await rpc('delete_my_account'); await signOut(); }
 
+  /* ---------- Kin Fit Plus ---------- */
+
+  // The signed-in member's access token, for the Kin Fit Edge Functions.
+  async function token() { const c = await sb(); const { data } = await c.auth.getSession(); return (data.session && data.session.access_token) || null; }
+  const plusActive = () => !!(st.profile && st.profile.plan === 'plus' && (!st.profile.plus_until || new Date(st.profile.plus_until) > new Date()));
+
   window.NA_CLOUD = {
-    enabled, google: !!CFG.google,
+    enabled, google: !!CFG.google, plusLinks: CFG.plus || {}, fnUrl: enabled ? `${CFG.url}/functions/v1/` : '', anonKey: CFG.key || '',
+    get plus() { return plusActive(); }, get plusUntil() { return st.profile && st.profile.plus_until; }, token,
     get user() { return st.user; }, get profile() { return st.profile; }, get signedIn() { return !!st.user; }, get linked() { return !!(st.user && st.profile); },
     start, onChange: (f) => st.listeners.push(f),
     signInEmail, signInGoogle, signOut, createProfile, push, pull,
