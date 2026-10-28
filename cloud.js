@@ -19,18 +19,27 @@
       if (error.status === 429 || /rate limit|too many/i.test(msg)) throw fail('rate_limited', error);
       if (/sending|smtp|email.*(send|deliver)|confirmation email|magic link/i.test(msg)) throw fail('email_send', error);
       if (/signups? not allowed|signup.*disabled/i.test(msg)) throw fail('signup_disabled', error);
-      if (/fetch|network/i.test(msg)) throw fail('network', error);
+      if (/fetch|network|load failed/i.test(msg)) throw fail('network', error);
       throw fail('server', error);
     }
     return data;
   };
   const here = () => location.href.split('#')[0].split('?')[0];
 
+  // The plan columns come from supabase/plus.sql; until it has run, profiles are read without them.
+  const BASE = 'id, pseudo, consent_at, updated_at, state';
+  let cols = `${BASE}, plan, plus_until`;
+  async function withCols(q) {
+    const r = await q(cols);
+    if (r.error && r.error.code === '42703' && cols !== BASE) { cols = BASE; return q(cols); }
+    return r;
+  }
+
   function emit(ev) { st.listeners.forEach((f) => { try { f(ev); } catch (e) { /* listener errors stay local */ } }); }
 
   async function loadProfile() {
     if (!st.user) { st.profile = null; return null; }
-    const data = check(await st.sb.from('profiles').select('id, pseudo, consent_at, updated_at, state, plan, plus_until').eq('id', st.user.id).maybeSingle());
+    const data = check(await withCols((c) => st.sb.from('profiles').select(c).eq('id', st.user.id).maybeSingle()));
     st.profile = data || null;
     return st.profile;
   }
@@ -72,7 +81,7 @@
   async function createProfile(pseudo, state) {
     const c = await sb(); if (!st.user) throw fail('signed_out');
     const row = { id: st.user.id, pseudo, consent_at: new Date().toISOString(), state: state || {}, updated_at: new Date().toISOString() };
-    st.profile = check(await c.from('profiles').insert(row).select('id, pseudo, consent_at, updated_at, state, plan, plus_until').single());
+    st.profile = check(await withCols((cs) => c.from('profiles').insert(row).select(cs).single()));
     return st.profile;
   }
   async function push(state) {
