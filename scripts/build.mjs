@@ -2,7 +2,7 @@
 import { cpSync, mkdirSync, rmSync } from 'node:fs';
 
 const FILES = ['index.html', 'manifest.webmanifest', 'sw.js', '_headers', 'styles.css',
-  'engine.js', 'circuits.js', 'exercises.js', 'i18n-data.js', 'i18n.js', 'meals.js', 'recipes.js', 'menus.js', 'stickers.js', 'ai.js', 'ai-core.mjs', 'config.js', 'cloud.js', 'app.js', 'confidentialite.html', 'cgv.html', 'fonts', 'icons', 'images'];
+  'engine.js', 'circuits.js', 'exercises.js', 'i18n-data.js', 'i18n.js', 'meals.js', 'recipes.js', 'menus.js', 'stickers.js', 'ai.js', 'ai-core.mjs', 'config.js', 'cloud.js', 'watch.js', 'app.js', 'confidentialite.html', 'cgv.html', 'fonts', 'icons', 'images'];
 
 rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist');

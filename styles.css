@@ -994,3 +994,18 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 .omad-checks { gap: 10px; }
 .omad-checks .check { display: flex; gap: 10px; align-items: flex-start; line-height: 1.4; cursor: pointer; }
 .omad-checks .check input { margin-top: 3px; width: 18px; height: 18px; accent-color: #d4af37; flex: none; }
+
+/* ---------- Watches ---------- */
+.watch-card .label { margin-top: 6px; }
+.watch-live, .g-hr { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); }
+.watch-live b, .g-hr b { font-size: 1.5rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.watch-live svg, .g-hr svg { color: #e5484d; width: 20px; height: 20px; }
+.g-hr { justify-content: center; width: 100%; margin: 4px 0 0; }
+.watch-rec { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 12px 14px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--line); }
+.watch-score { display: grid; }
+.watch-score b { font-size: 2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.watch-score span { color: var(--text-2); font-size: .875rem; }
+.watch-rec--vert .watch-score b { color: #b7d96a; }
+.watch-rec--jaune .watch-score b { color: #f3dc8c; }
+.watch-rec--rouge .watch-score b { color: #ff8a80; }
+.watch-rec .facts { margin: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }

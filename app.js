@@ -18,6 +18,7 @@
     heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
     bowl: 'M3 11h18a9 9 0 0 1-18 0zM9 11c0-2.5 1.5-4.5 3.5-5.5M15 7.5c.8.9 1.3 2.1 1.3 3.5',
     clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+    watch: 'M9 2h6l1 4.2M8 6.2L9 2M8 17.8L9 22h6l1-4.2M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 9v3l2 1.5',
     drop: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z',
     flame: 'M12 21c-3.9 0-7-2.7-7-6.5 0-3.5 3-5.5 4-9 2 1.5 3 3.5 3 5.5 1-1 1.5-2 1.5-3.5 2.5 2 5.5 4.5 5.5 7 0 3.8-3.1 6.5-7 6.5z',
     trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6',
@@ -494,7 +495,7 @@
       <dl class="facts"><div><dt>Format</dt><dd>${esc(item.format)}</dd></div><div><dt>Objectif</dt><dd>${esc(item.obj)}</dd></div></dl>
       <p><b>Conseils techniques :</b> ${esc(item.conseils)}</p>
       <p><a href="${yt(item.q)}" target="_blank" rel="noopener">${icon('link')}Chercher « ${esc(item.q)} » sur YouTube</a></p>
-      ${opts.check && !opts.readOnly ? `<div class="card-foot"><button type="button" class="btn btn--${done ? 'done' : 'cat'}" data-tap="cardio" aria-pressed="${done}">${done ? icon('check') + 'Cardio terminé' : 'J’ai terminé mon cardio'}</button></div>` : ''}
+      ${opts.check && !opts.readOnly ? `<div class="card-foot"><button type="button" class="btn btn--${done ? 'done' : 'cat'}" data-tap="cardio" aria-pressed="${done}">${done ? icon('check') + 'Cardio terminé' : 'J’ai terminé mon cardio'}</button>${done && L0.auto ? `<span class="hint">Validé par ${L0.auto === 'whoop' ? 'Whoop' : 'Strava'}</span>` : ''}</div>` : ''}
     </article>`;
   }
 
@@ -876,6 +877,7 @@
       <div class="today-grid">
         <div class="stack">${main}</div>
         <div class="stack">
+          ${watchDayCard(sess, ui.day)}
           ${breakfastCard(sess, item, L0, { readOnly: ro })}
           ${mealsCard(sess, ui.day)}
           <article class="card card--eau"><header class="card-head"><span class="chip-ico">${icon('drop')}</span><div><h2 class="h2">Eau</h2><p class="muted">${water.progress} verre${water.progress > 1 ? 's' : ''} sur 8 · objectif 2 litres</p></div></header>${ro ? '' : glasses(water.progress)}</article>
@@ -1230,7 +1232,7 @@
     } else if (remote && pr.updated_at > (sess.cloudAt || '')) adopt(sess, remote, pr.updated_at);
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* in-memory only */ }
     if (!document.activeElement.matches('input, textarea, select')) render();
-    refreshSocial();
+    refreshSocial(); finishWatchLink();
   }
 
   async function refreshSocial() {
@@ -1315,6 +1317,161 @@
     const q = new URLSearchParams({ client_reference_id: CLOUD.user.id }); if (CLOUD.user.email) q.set('prefilled_email', CLOUD.user.email);
     return `${base}${base.includes('?') ? '&' : '?'}${q}`;
   }
+  /* ---------- Watches (watch.js) ---------- */
+
+  const W = window.NA_WATCH;
+  const PROV = { strava: 'Strava', whoop: 'Whoop' };
+  const WATCH_ERR = {
+    unsupported: 'Ce navigateur ne gère pas le Bluetooth. Sur Android ou ordinateur, ouvre Kin Fit dans Chrome ou Edge. Sur iPhone, relie plutôt Strava ou Whoop.',
+    cancelled: '', bluetooth: 'Connexion au capteur impossible. Vérifie qu’il est allumé, porté et qu’il diffuse la fréquence cardiaque.',
+    not_configured: 'Cette liaison arrive bientôt.', not_deployed: 'Cette liaison arrive bientôt.', signed_out: 'Connecte-toi à ton compte Kin Fit pour relier une montre.',
+    state: 'La liaison a expiré. Relance-la depuis Profil.', denied: 'Liaison annulée.', scope: 'Coche l’accès à tes activités pour que Kin Fit lise tes séances.',
+    code_refused: 'Le service a refusé la liaison. Relance-la depuis Profil.', revoked: 'La liaison a été coupée depuis le service. Relie-la de nouveau si tu veux.',
+    rate_limited: 'Le service limite les demandes. Réessaie dans un quart d’heure.', network: 'Pas de connexion. Réessaie dans un moment.',
+  };
+  const watchErr = (e) => WATCH_ERR[e && e.code] ?? 'Ça n’a pas marché. Réessaie dans un moment.';
+  const wdata = (sess) => { sess.watch = sess.watch || { acts: [], rec: {}, links: {}, at: 0 }; return sess.watch; };
+  const mine = () => (CLOUD.linked ? state.sessions.find((x) => x.uid === CLOUD.user.id) || null : null);
+  const SPORT_FR = {
+    run: 'Course à pied', trailrun: 'Trail', running: 'Course à pied', ride: 'Vélo', cycling: 'Vélo', virtualride: 'Vélo d’intérieur', spin: 'Vélo d’intérieur',
+    ebikeride: 'Vélo électrique', mountainbikeride: 'VTT', gravelride: 'Vélo gravel', swim: 'Natation', swimming: 'Natation', walk: 'Marche', walking: 'Marche',
+    hike: 'Randonnée', hiking: 'Randonnée', rowing: 'Aviron', virtualrow: 'Rameur', weighttraining: 'Musculation', weightlifting: 'Musculation',
+    'functional-fitness': 'Renforcement', workout: 'Entraînement', crossfit: 'CrossFit', yoga: 'Yoga', pilates: 'Pilates', elliptical: 'Elliptique',
+    stairstepper: 'Stepper', highintensityintervaltraining: 'HIIT', hiit: 'HIIT', soccer: 'Football', basketball: 'Basket', tennis: 'Tennis', boxing: 'Boxe',
+  };
+  const sportFr = (t) => SPORT_FR[String(t).toLowerCase()] || String(t || 'Activité').replace(/[-_]/g, ' ');
+  // Strength, mobility and recovery sessions do not count as the day's cardio.
+  const NOT_CARDIO = /weight|strength|crossfit|functional|yoga|pilates|stretch|mobility|meditation|sauna|massage/i;
+  const MET = [[/run|trail/i, 9.8], [/ride|cycl|spin|bike/i, 7.5], [/swim/i, 8], [/row/i, 7], [/walk/i, 3.8], [/hike/i, 6], [/weight|strength|crossfit|functional/i, 5], [/yoga|pilates|stretch/i, 2.8]];
+  // Energy of an imported activity: the service's figure, else the heart rate, else a MET estimate.
+  function actKcal(a, p) {
+    if (a.kcal) return a.kcal;
+    if (a.hr) return W.kcalFromHr(a.hr, a.min, p);
+    const m = (MET.find(([re]) => re.test(a.type)) || [0, 6])[1];
+    return Math.round((m * (+p.poids || 70) * a.min) / 60);
+  }
+
+  function mergeWatch(sess, res) {
+    const w = wdata(sess); const cut = iso(new Date(TODAY.getTime() - 30 * 864e5)); const day = /^\d{4}-\d\d-\d\d$/;
+    const byId = new Map(w.acts.map((a) => [a.id, a]));
+    (res.acts || []).forEach((a) => { if (a && a.id && day.test(a.day)) byId.set(String(a.id), { id: String(a.id), src: a.src === 'whoop' ? 'whoop' : 'strava', day: a.day, time: String(a.time || '').slice(0, 5), type: String(a.type || '').slice(0, 40), min: Math.max(0, +a.min || 0), km: +a.km || 0, hr: +a.hr || 0, hrMax: +a.hrMax || 0, kcal: +a.kcal || 0, strain: +a.strain || 0 }); });
+    w.acts = [...byId.values()].filter((a) => a.day >= cut).sort((a, b) => `${a.day}${a.time}`.localeCompare(`${b.day}${b.time}`)).slice(-150);
+    (res.rec || []).forEach((r) => { if (r && day.test(r.day)) w.rec[r.day] = { score: +r.score || 0, rhr: +r.rhr || 0, hrv: +r.hrv || 0, sleep: +r.sleep || 0 }; });
+    Object.keys(w.rec).forEach((d) => { if (d < cut) delete w.rec[d]; });
+  }
+
+  // An imported outing long enough validates this week's planned cardio, and yoga or stretching a rest day.
+  function autoValidate(sess) {
+    const w = wdata(sess); let n = 0;
+    for (let i = 0; i <= todayIdx; i += 1) {
+      const d = iso(dayDate(i)); const acts = w.acts.filter((a) => a.day === d); if (!acts.length) continue;
+      const sv = dayView(sess, i); const it = sv.rest ? null : buildPlan(sv).byDay(i); const L = lg(sess, d);
+      if (it && it.kind !== 'muscu' && L.status !== 'faite') {
+        const a = acts.find((x) => !NOT_CARDIO.test(x.type) && x.min >= Math.max(15, Math.round(it.duree * 0.6)));
+        if (a) { L.status = 'faite'; L.auto = a.src; n += 1; }
+      } else if (!it && !L.mob && acts.some((x) => /yoga|pilates|stretch|mobility/i.test(x.type) && x.min >= 10)) { L.mob = true; L.auto = acts[0].src; n += 1; }
+    }
+    return n;
+  }
+
+  let watchBusy = false; let watchChecked = false;
+  async function syncWatches(force) {
+    const sess = mine(); if (!W || !sess || watchBusy) return;
+    const w = wdata(sess); const on = Object.keys(w.links).filter((p) => w.links[p]);
+    if (!on.length || (!force && Date.now() - (w.at || 0) < 30 * 60000)) return;
+    watchBusy = true; let err = null;
+    try {
+      for (const p of on) {
+        try { mergeWatch(sess, await W.sync(p, w.at ? 7 : 30)); } catch (e) { if (e.code === 'revoked' || e.code === 'not_linked') delete w.links[p]; err = err || e; }
+      }
+      w.at = Date.now();
+      const n = autoValidate(sess);
+      if (sess === cur()) settle(sess, !n); else save();
+      if (!document.activeElement.matches('input, textarea, select')) render();
+      if (force) toast(err ? watchErr(err) : n ? 'Séance validée grâce à ta montre.' : 'Montre synchronisée.');
+    } finally { watchBusy = false; }
+  }
+  async function watchRefresh() {
+    if (!W || !CLOUD.linked) return;
+    if (!watchChecked) {
+      watchChecked = true;
+      try {
+        const s = await W.status(); const sess = mine();
+        ui.watchReady = { strava: !!(s.strava && s.strava.ready), whoop: !!(s.whoop && s.whoop.ready) };
+        if (sess) { const w = wdata(sess); ['strava', 'whoop'].forEach((p) => { if (s[p] && s[p].linked) w.links[p] = s[p].name || true; else delete w.links[p]; }); save(); }
+      } catch (e) { ui.watchReady = e.code === 'not_deployed' ? { strava: false, whoop: false } : null; watchChecked = e.code === 'not_deployed'; }
+      if (ui.view === 'profil' && !document.activeElement.matches('input, textarea, select')) render();
+    }
+    return syncWatches();
+  }
+  // Coming back from the Strava or Whoop sign-in page.
+  const watchBack = W ? W.returning() : null;
+  if (watchBack) history.replaceState(null, '', location.pathname + location.hash);
+  async function finishWatchLink() {
+    if (!watchBack || watchBack.done || !CLOUD.linked) return watchRefresh();
+    watchBack.done = true; const p = watchBack.provider;
+    try {
+      const r = await W.finish(watchBack); const sess = mine();
+      if (sess) { wdata(sess).links[p] = r.name || true; wdata(sess).at = 0; save(); }
+      toast(`${PROV[p]} relié.`); watchChecked = true; ui.watchReady = { ...(ui.watchReady || {}), [p]: true };
+      await syncWatches(true);
+    } catch (e) { const m = watchErr(e); if (m) toast(m); }
+  }
+
+  const hrLine = (p, live) => { const b = W.live; const z = b ? W.zone(b, p.age) : null; return `${icon('heart')}<b>${b || '--'}</b> bpm${z ? ` · ${z.name}` : live ? ' · en attente du pouls' : ''}`; };
+  function watchCard(sess) {
+    if (!W) return '';
+    const w = wdata(sess); const rd = ui.watchReady || {}; const p = sess.profile;
+    const bt = !W.bt ? '<p class="hint">Ce navigateur ne gère pas le Bluetooth. Sur iPhone, relie plutôt Strava ou Whoop ; sur Android ou ordinateur, ouvre Kin Fit dans Chrome.</p>'
+      : W.linked ? `<p><b data-no-i18n>${esc(W.name || 'Capteur cardio')}</b></p><p class="watch-live" id="w-bpm">${hrLine(p, true)}</p><div class="actions"><button type="button" class="btn btn--ghost" data-act="hr-off">Déconnecter le capteur</button></div>`
+        : `<p>Ceinture cardio, ou montre qui diffuse sa fréquence cardiaque (Garmin, Polar, Coros, Suunto…) : ton pouls et ta zone s’affichent pendant la séance guidée, et ta dépense est calculée sur ton vrai effort.</p><div class="actions"><button type="button" class="btn" data-act="hr-on">${icon('heart')}Connecter un capteur</button></div>`;
+    const row = (k) => {
+      const on = w.links[k]; const soon = rd[k] === false;
+      const sub = on ? `Relié${typeof on === 'string' ? ` · <span data-no-i18n>${esc(on)}</span>` : ''}` : soon ? 'Bientôt disponible' : k === 'strava' ? 'Course, vélo, natation et toutes tes séances' : 'Récupération, sommeil et séances';
+      const btn = !CLOUD.linked || soon ? '' : on ? `<button type="button" class="btn btn--ghost" data-wunlink="${k}">Délier</button>` : `<button type="button" class="btn" data-wlink="${k}">Relier</button>`;
+      return `<li><span><b>${PROV[k]}</b><small>${sub}</small></span>${btn}</li>`;
+    };
+    const any = Object.values(w.links).some(Boolean);
+    const at = w.at ? new Date(w.at).toLocaleTimeString(window.NA_I18N.locale, { hour: '2-digit', minute: '2-digit' }) : '';
+    return `<article class="card watch-card" id="watch-card"><header class="card-head"><span class="chip-ico">${icon('watch')}</span><div><h2 class="h2">Montres et capteurs</h2><p class="muted">Gratuit</p></div></header>
+      <p class="label">Fréquence cardiaque en direct</p>${bt}
+      ${CLOUD.enabled ? `<p class="label">Applications</p><ul class="food-rows watch-list">${row('strava')}${row('whoop')}</ul>
+      ${!CLOUD.linked ? '<p class="hint">Crée ton compte Kin Fit gratuit pour relier Strava ou Whoop.</p>' : any ? `<div class="actions"><button type="button" class="btn btn--ghost" data-act="watch-sync">Synchroniser</button>${at ? `<span class="hint">Synchronisé · ${at}</span>` : ''}</div>` : ''}
+      <p class="hint">Kin Fit lit seulement tes activités et, pour Whoop, ta récupération et ton sommeil. Rien n’est publié en ton nom, et tu peux délier à tout moment. Apple Watch : partage tes séances vers Strava pour les retrouver ici.</p>` : ''}
+    </article>`;
+  }
+
+  const REC = { vert: 'Feu vert : tu peux faire ta séance comme prévu, et même pousser un peu.', jaune: 'Récupération moyenne : fais ta séance, sans chercher de record.', rouge: 'Récupération basse : préfère une séance légère ou de la mobilité aujourd’hui, et couche-toi tôt.' };
+  function watchDayCard(sess, dayI) {
+    if (!W) return '';
+    const d = iso(dayDate(dayI)); const w = sess.watch || { acts: [], rec: {} }; const L0 = sess.log[d] || {}; const p = sess.profile;
+    const acts = w.acts.filter((a) => a.day === d); const rec = w.rec[d]; const h = L0.hr;
+    if (!acts.length && !rec && !h) return '';
+    const kc = acts.reduce((t, a) => t + actKcal(a, p), 0) + (h ? h.kcal : 0);
+    const lvl = rec ? (rec.score >= 67 ? 'vert' : rec.score >= 34 ? 'jaune' : 'rouge') : '';
+    const recBlock = rec ? `<div class="watch-rec watch-rec--${lvl}"><p class="watch-score"><b>${rec.score} %</b><span>récupération</span></p>
+        <dl class="facts">${rec.rhr ? `<div><dt>FC au repos</dt><dd>${rec.rhr} bpm</dd></div>` : ''}${rec.hrv ? `<div><dt>VFC</dt><dd>${rec.hrv} ms</dd></div>` : ''}${rec.sleep ? `<div><dt>Sommeil</dt><dd>${String(rec.sleep).replace('.', ',')} h</dd></div>` : ''}</dl></div>
+      ${dayI === todayIdx ? `<p>${REC[lvl]}</p>` : ''}` : '';
+    const line = (parts) => parts.filter(Boolean).join(' · ');
+    const rows = [
+      ...(h ? [`<li><span><b>Séance guidée</b><small>${line([`${h.min} min`, `FC ${h.avg}`, `max ${h.max}`, `≈ ${h.kcal} kcal`])}</small></span><span class="tag">Kin Fit</span></li>`] : []),
+      ...acts.map((a) => `<li><span><b>${esc(sportFr(a.type))}</b><small>${line([a.time, `${a.min} min`, a.km ? `${String(a.km).replace('.', ',')} km` : '', a.hr ? `FC ${a.hr}` : '', a.strain ? `effort ${String(a.strain).replace('.', ',')}` : '', `≈ ${actKcal(a, p)} kcal`])}</small></span><span class="tag">${PROV[a.src]}</span></li>`),
+    ];
+    return `<article class="card watch-day"><header class="card-head"><span class="chip-ico">${icon('watch')}</span><div><h2 class="h2">Ma montre</h2><p class="muted">${kc ? `Dépense sportive · ≈ ${kc} kcal` : 'Récupération'}</p></div></header>
+      ${recBlock}${rows.length ? `<ul class="food-rows">${rows.join('')}</ul>` : ''}</article>`;
+  }
+  // Closes the heart-rate recording of a guided session and keeps its summary for the day.
+  function endHr(g) {
+    if (!W || !W.recording || !g) return;
+    const r = W.stopRec(); if (!r) return;
+    const sess = cur(); r.kcal = W.kcalFromHr(r.avg, r.min, sess.profile); lg(sess, iso(TODAY)).hr = r; g.hrSum = r; save();
+  }
+  if (W) W.onChange(() => {
+    const p = cur() && cur().profile; if (!p) return;
+    const a = $('#w-bpm'); if (a) a.innerHTML = hrLine(p, true);
+    const b = $('#g-hr'); if (b && W.linked) b.innerHTML = hrLine(p, true);
+  });
+
   function plusCard() {
     if (!CLOUD.enabled) return '';
     const perks = ['Coach IA qui répond à tes questions', 'Compteur de calories en photo', 'Programme et menus réécrits par l’IA', 'Nouveautés Plus en avant-première'];
@@ -1370,6 +1527,7 @@
           <div class="actions"><button type="button" class="btn" data-act="edit">Modifier mon profil</button><button type="button" class="btn btn--ghost" data-act="new">Nouvelle session</button></div></article>
         ${plusCard()}
         ${accountCard(sess)}
+        ${watchCard(sess)}
         <article class="card share-card"><header class="card-head"><span class="chip-ico">${icon('share')}</span><div><h2 class="h2">Fais découvrir Kin Fit</h2><p class="muted">Gratuit, sans publicité</p></div></header>
           <p>${CLOUD.linked ? 'Envoie le lien de l’app : ton ami pourra t’ajouter en un geste après avoir créé son compte.' : 'Envoie le lien de l’app à tes proches pour vous lancer des défis.'}</p>
           <div class="actions"><button type="button" class="btn" data-act="share-app">${icon('share')}Partager l’app</button></div></article>
@@ -1594,7 +1752,8 @@
     const old = $('#guide'); if (old) old.remove();
     const dlg = document.createElement('dialog'); dlg.id = 'guide'; dlg.className = 'dlg dlg--full guide'; dlg.setAttribute('aria-label', 'Séance guidée');
     document.body.appendChild(dlg);
-    dlg.addEventListener('close', () => { clearInterval(guideTimer); keepAwake(false); dlg.remove(); const s = cur(); ui.guide = null; if (s) { settle(s); render(); } });
+    dlg.addEventListener('close', () => { clearInterval(guideTimer); keepAwake(false); endHr(ui.guide); dlg.remove(); const s = cur(); ui.guide = null; if (s) { settle(s); render(); } });
+    if (W && W.linked) W.startRec();
     renderGuide(); dlg.showModal(); keepAwake(true);
   }
 
@@ -1610,8 +1769,9 @@
     const head = (pct, title) => `<header class="g-head"><button type="button" class="round" data-act="g-quit" aria-label="Quitter la séance">${icon('x')}</button><div class="g-bar" role="progressbar" aria-label="Progression de la séance" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></div><p class="g-title">${esc(title)}</p></header>`;
     let body = '';
     if (g.phase === 'done') {
-      const kcal = g.kind === 'muscu' ? sessionMeta(g.item, p, sess.seed).kcal : g.item.kcal;
-      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">Séance terminée !</h2><p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : ''}≈ ${kcal} kcal dépensées</p><p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div>`;
+      endHr(g); const h = g.hrSum;
+      const kcal = h ? h.kcal : g.kind === 'muscu' ? sessionMeta(g.item, p, sess.seed).kcal : g.item.kcal;
+      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">Séance terminée !</h2><p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : ''}≈ ${kcal} kcal dépensées</p>${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div>`;
     } else if (g.kind === 'cardio') {
       const it = g.item;
       body = `${head(((g.total - g.left) / g.total) * 100, it.title)}<div class="g-main"><h2 class="g-name">${esc(it.type)}</h2><p class="g-sub">${esc(it.format)}</p>
@@ -1634,7 +1794,9 @@
           <p class="hint">${st.rest ? `Puis ${st.rest} s de repos.` : 'Enchaîne directement avec l’exercice suivant.'}</p></div>`;
       }
     }
-    dlg.innerHTML = `<div class="dlg-body g-body">${body}</div>`;
+    // Live heart rate under the header while a strap is connected, or the way to connect one.
+    const hrBar = !W || g.phase === 'done' ? '' : W.linked ? `<p class="g-hr" id="g-hr" aria-live="off">${hrLine(p, true)}</p>` : W.bt ? '<p class="g-hr"><button type="button" class="link-btn" data-act="hr-on">Connecter un capteur cardio</button></p>' : '';
+    dlg.innerHTML = `<div class="dlg-body g-body">${hrBar ? body.replace('</header>', `</header>${hrBar}`) : body}</div>`;
   }
 
   function guideTick() {
@@ -1964,6 +2126,13 @@
     if (t.dataset.video) return openVideo(t.dataset.video, t.dataset.vkit);
     if (t.dataset.mslot) return fileMeal(t.dataset.mslot);
     if (t.dataset.rstep) { const on = t.getAttribute('aria-pressed') !== 'true'; t.setAttribute('aria-pressed', String(on)); if (on && navigator.vibrate) navigator.vibrate(15); return; }
+    if (t.dataset.wlink) { if (!CLOUD.linked) { toast(WATCH_ERR.signed_out); return; } t.disabled = true; try { await W.link(t.dataset.wlink); } catch (err) { t.disabled = false; toast(watchErr(err)); } return; }
+    if (t.dataset.wunlink && sess) {
+      const k = t.dataset.wunlink; t.disabled = true;
+      try { await W.unlink(k); } catch (err) { if (err.code !== 'not_linked') { t.disabled = false; toast(watchErr(err)); return; } }
+      const w = wdata(sess); delete w.links[k]; w.acts = w.acts.filter((x) => x.src !== k); if (k === 'whoop') w.rec = {};
+      save(); render(); toast(`${PROV[k]} délié.`); return;
+    }
     if (t.dataset.faccept) { try { await CLOUD.acceptFriend(+t.dataset.faccept); toast('Ami ajouté.'); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
     if (t.dataset.fremove) { try { await CLOUD.removeFriend(+t.dataset.fremove); } catch (err) { toast(cloudErr(err)); } return refreshSocial(); }
     if (t.dataset.bf && sess) { sess.profile.petitdej = t.dataset.bf; save(); render(); return refocus(`[data-bf="${t.dataset.bf}"]`); }
@@ -2065,6 +2234,12 @@
       return;
     }
     if (a === 'ai-setup') { go('profil'); const c = $('#plus-card') || $$('.ai-card').find((x) => x.querySelector('input[name="aiprov"]')); if (c) c.scrollIntoView({ block: 'start' }); return; }
+    if (a === 'hr-on') {
+      try { await W.connect(); if (ui.guide && !W.recording) W.startRec(); toast('Capteur cardio connecté.'); } catch (err) { const m = watchErr(err); if (m) toast(m); }
+      if (ui.guide) renderGuide(); else render(); return;
+    }
+    if (a === 'hr-off') { W.disconnect(); render(); return; }
+    if (a === 'watch-sync') { t.disabled = true; await syncWatches(true); t.disabled = false; return; }
     if (a === 'checkin') return openCheckin();
     if (a === 'checkin-close') { const d = $('#checkin'); if (d) d.close(); return; }
     if (a === 'omad-open') { openOmad(); return; }
@@ -2247,7 +2422,7 @@
       if (!ok) return; linkAccount();
       if (/[?&]plus=ok/.test(location.search)) { history.replaceState(null, '', location.pathname); CLOUD.pull().then(() => { render(); toast(CLOUD.plus ? 'Bienvenue dans Kin Fit Plus !' : 'Paiement reçu : Plus s’active dans une minute.'); }).catch(() => {}); }
     });
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && CLOUD.linked) CLOUD.pull().then(() => linkAccount()).catch(() => {}); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && CLOUD.linked) CLOUD.pull().then(() => linkAccount()).then(() => syncWatches()).catch(() => {}); });
   }
   AI.ping.then((ok) => { if (ok && !ui.ob && !document.activeElement.matches('input, textarea, select')) render(); });
 })();
