@@ -1790,7 +1790,7 @@
     if (g.phase === 'done') {
       endHr(g); const h = g.hrSum;
       const kcal = h ? h.kcal : g.kind === 'muscu' ? sessionMeta(g.item, p, sess.seed).kcal : g.item.kcal;
-      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">${g.kind === 'circuit' ? 'Parcours terminé !' : 'Séance terminée !'}</h2>${g.kind === 'circuit' && g.c.mode === 'temps' ? `<div class="c-total"><b>${mmss(g.final || g.clock)}</b><span>temps total</span></div>${g.newRecord ? `<p class="c-newrec">${icon('trophy')}${g.prevRec ? `Nouveau record ! ${mmss(g.prevRec.t - g.final)} de mieux` : 'Premier record enregistré !'}</p>` : g.prevRec ? `<p class="hint">Ton record : ${mmss(g.prevRec.t)}</p>` : ''}` : ''}<p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : g.kind === 'circuit' ? `${Math.max(1, Math.round(g.spent / 60))} min · ` : ''}≈ ${kcal} kcal dépensées</p>${g.kind === 'circuit' && g.splits && g.splits.length ? `<ol class="c-splits">${[...g.splits].sort((a, b) => a.k - b.k).map((y) => `<li><span>${esc(y.n)}</span><b>${mmss(y.t)}</b></li>`).join('')}</ol>` : ''}${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div>`;
+      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">${g.kind === 'circuit' ? 'Parcours terminé !' : 'Séance terminée !'}</h2>${g.kind === 'circuit' && g.c.mode === 'temps' ? `<div class="c-total"><b>${mmss(g.final || g.clock)}</b><span>temps total</span></div>${g.newRecord ? `<p class="c-newrec">${icon('trophy')}${g.prevRec ? `Nouveau record ! ${mmss(g.prevRec.t - g.final)} de mieux` : 'Premier record enregistré !'}</p>` : g.prevRec ? `<p class="hint">Ton record : ${mmss(g.prevRec.t)}</p>` : ''}` : ''}<p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : g.kind === 'circuit' ? `${Math.max(1, Math.round(g.spent / 60))} min · ` : ''}≈ ${kcal} kcal dépensées</p>${g.kind === 'circuit' && g.splits && g.splits.length ? `<ol class="c-splits">${[...g.splits].sort((a, b) => a.k - b.k).map((y) => `<li><span>${esc(y.n)}</span><b>${mmss(y.t)}</b></li>`).join('')}</ol>` : ''}${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><div class="actions g-actions"><button type="button" class="btn btn--big btn--ghost" data-act="g-share">${icon('share')}Partager</button><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div></div>`;
     } else if (g.kind === 'circuit') {
       body = circuitBody(g, p, head);
     } else if (g.kind === 'cardio') {
@@ -1835,6 +1835,53 @@
     }
   }
   const startTimer = () => { clearInterval(guideTimer); guideTimer = setInterval(guideTick, 1000); };
+  /* ---------- Share card: a 1080×1920 story image of the finished workout ---------- */
+
+  async function shareCard() {
+    const g = ui.guide; if (!g) return;
+    const sess = cur(); const p = g.sv.profile; const h = g.hrSum;
+    const kcal = h ? h.kcal : g.kind === 'muscu' ? sessionMeta(g.item, p, sess.seed).kcal : g.item.kcal;
+    const tr = (x) => (window.NA_I18N && window.NA_I18N.t ? window.NA_I18N.t(x) : x);
+    const timed = g.kind === 'circuit' && g.c.mode === 'temps';
+    const min = g.kind === 'circuit' ? Math.max(1, Math.round(g.spent / 60)) : g.kind === 'cardio' ? g.item.duree : sessionMeta(g.item, p, sess.seed).duree;
+    const big = timed ? mmss(g.final || g.clock) : String(kcal); const bigSub = timed ? tr('temps total') : 'kcal';
+    const stats = [[`${min}`, 'min'], ...(timed ? [[`${kcal}`, 'kcal']] : []), ...(h ? [[`${h.avg}`, tr('FC moyenne')]] : []),
+      ...(g.kind === 'muscu' ? [[`${g.steps.length}`, tr('séries')]] : g.kind === 'circuit' ? [[`${g.segs.filter((y) => y.x).length}`, tr('Exercices').toLowerCase()]] : [])];
+    try { await Promise.all(['400 120px "Dela Gothic One"', '800 60px "Outfit"', '600 40px "Outfit"'].map((f) => document.fonts.load(f))); } catch (e) { /* system font */ }
+    const cv = document.createElement('canvas'); cv.width = 1080; cv.height = 1920; const x = cv.getContext('2d');
+    x.fillStyle = '#05080a'; x.fillRect(0, 0, 1080, 1920);
+    const glow = (cx, cy, r, c) => { const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, c); gr.addColorStop(1, 'rgba(5,8,10,0)'); x.fillStyle = gr; x.fillRect(0, 0, 1080, 1920); };
+    glow(980, 120, 900, 'rgba(255,46,136,.42)'); glow(80, 1800, 1000, 'rgba(198,255,0,.30)');
+    const neon = (txt, px, py, font, color, blur, align = 'left') => { x.font = font; x.textAlign = align; x.shadowColor = color; x.shadowBlur = blur; x.fillStyle = color; x.fillText(txt, px, py); x.shadowBlur = 0; };
+    neon('KIN FIT', 90, 170, '400 64px "Dela Gothic One", sans-serif', '#c6ff00', 30);
+    const day = new Date().toLocaleDateString(window.NA_I18N.locale, { weekday: 'long', day: 'numeric', month: 'long' });
+    neon(day.toUpperCase(), 990, 165, '600 34px "Outfit", sans-serif', '#93aeb3', 0, 'right');
+    const title = tr(g.item.title).toUpperCase(); x.font = '400 92px "Dela Gothic One", sans-serif';
+    const words = title.split(' '); const lines = []; let line = '';
+    words.forEach((w) => { const t = line ? `${line} ${w}` : w; if (x.measureText(t).width > 900 && line) { lines.push(line); line = w; } else line = t; }); lines.push(line);
+    lines.slice(0, 3).forEach((l, i) => neon(l, 90, 520 + i * 110, '400 92px "Dela Gothic One", sans-serif', '#eefcf5', 0));
+    const top = 520 + Math.min(3, lines.length) * 110 + 260;
+    let bs = 300; x.font = `400 ${bs}px "Dela Gothic One", sans-serif`; while (x.measureText(big).width > 920 && bs > 120) { bs -= 10; x.font = `400 ${bs}px "Dela Gothic One", sans-serif`; }
+    neon(big, 540, top, `400 ${bs}px "Dela Gothic One", sans-serif`, '#e2ff7a', 60, 'center');
+    neon(bigSub.toUpperCase(), 540, top + 90, '700 44px "Outfit", sans-serif', '#93aeb3', 0, 'center');
+    if (g.newRecord) {
+      const lab = tr('Nouveau record').toUpperCase(); x.font = '800 46px "Outfit", sans-serif'; const w = x.measureText(lab).width + 90;
+      x.shadowColor = '#ff2e88'; x.shadowBlur = 40; x.fillStyle = '#ff2e88'; x.beginPath(); x.roundRect(540 - w / 2, top + 140, w, 90, 45); x.fill(); x.shadowBlur = 0;
+      neon(lab, 540, top + 200, '800 46px "Outfit", sans-serif', '#ffffff', 0, 'center');
+    }
+    const sy = 1560; const cw = 900 / stats.length;
+    stats.forEach(([v, l], i) => { const cx = 90 + cw * i + cw / 2; neon(v, cx, sy, '800 96px "Outfit", sans-serif', i % 2 ? '#ff6fb5' : '#c6ff00', 24, 'center'); neon(l.toUpperCase(), cx, sy + 60, '600 34px "Outfit", sans-serif', '#93aeb3', 0, 'center'); });
+    x.strokeStyle = 'rgba(198,255,0,.35)'; x.lineWidth = 2; x.beginPath(); x.moveTo(90, 1720); x.lineTo(990, 1720); x.stroke();
+    neon('adlnri.github.io/kin-fit', 540, 1800, '600 36px "Outfit", sans-serif', '#eefcf5', 0, 'center');
+    const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
+    const file = new File([blob], 'kinfit.png', { type: 'image/png' });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Kin Fit', text: `${tr(g.item.title)} · ${big} ${bigSub}` }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'kinfit.png'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('Image enregistrée.');
+  }
+
   function celebrateGuide() { if (navigator.vibrate) navigator.vibrate(300); sparks(innerWidth / 2, innerHeight / 3, 120, 0.9); }
   /* ---------- Guided Parcours: every segment timed, with beeps, voice and what comes next ---------- */
 
@@ -2459,6 +2506,7 @@
     if (a === 'g-plus' && ui.guide) { ui.guide.left += 15; ui.guide.restTotal += 15; return; }
     if (a === 'g-toggle' && ui.guide) { ui.guide.paused = !ui.guide.paused; if (!ui.guide.paused) startTimer(); renderGuide(); return; }
     if (a === 'g-cardio-done' && ui.guide) { finishCardio(); return; }
+    if (a === 'g-share' && ui.guide) { shareCard(); return; }
     if (a === 'circuit-start') { openCircuit(); return; }
     if (a === 'c-toggle' && ui.guide) {
       const g = ui.guide; g.paused = !g.paused;

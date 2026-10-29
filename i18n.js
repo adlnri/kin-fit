@@ -28,6 +28,9 @@
   /* Strings added after the bulk translation (welcome, budget, regions, alternatives, patterns' words). */
   const EXTRA = {
     'Bienvenue': ['Welcome', 'Bienvenido'],
+    'Nouveau record': ['New record', 'Nuevo récord'],
+    'Image enregistrée.': ['Image saved.', 'Imagen guardada.'],
+    'séries': ['sets', 'series'],
     'Au chrono': ['Timed', 'Por tiempo'],
     'Pour le temps': ['For time', 'A contrarreloj'],
     'Format du parcours': ['Circuit format', 'Formato del circuito'],
