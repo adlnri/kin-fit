@@ -33,6 +33,11 @@
     a2: svg(`<path d="M8 40h22a12 12 0 0 1 0 24H8z" fill="${W}"/><path d="M92 40H70a12 12 0 0 0 0 24h22z" fill="${W}"/><path d="M18 40v-4M26 40v-5M74 40v-5M82 40v-4"/>${star(50, 52, 12)}<path d="M50 20v8M50 76v8M36 26l4 6M64 26l-4 6" stroke-width="3"/>`),
     a3: svg(`<path d="M10 52l10-8v24l-10-8M90 52l-10-8v24l10-8" fill="${G}"/><path d="M20 40h60v32H20z" fill="${W}"/>${star(32, 56, 9)}${star(50, 56, 9)}${star(68, 56, 9)}<path d="M50 16v12M36 20l4 8M64 20l-4 8" stroke-width="3"/>`),
     a4: svg(`<path d="M16 42h14l36-20v56L30 58H16z" fill="${W}"/><path d="M30 42v16"/><path d="M24 58l6 20h10l-4-20" fill="${G}"/><path d="M76 38c5 4 5 20 0 24M84 30c9 8 9 32 0 40"/>`),
+    p1: svg(`<path d="M56 8L24 54h22l-6 38 34-50H52z" fill="${G}"/><path d="M14 86h72"/>`),
+    p2: svg(`<circle cx="50" cy="56" r="30" fill="${W}"/><path d="M42 14h16M50 14v12M76 30l6-6"/><path d="M50 56V38M50 56l12 8" stroke-width="5"/><circle cx="50" cy="56" r="4" fill="${G}"/>`),
+    p3: svg(`<path d="M30 14h40v18a20 20 0 0 1-40 0z" fill="${G}"/><path d="M30 20H18a12 12 0 0 0 12 14M70 20h12a12 12 0 0 1-12 14"/><path d="M44 52h12v14H44zM34 66h32v12H34z" fill="${W}"/><path d="M50 24v-6M44 22l6-6 6 6" stroke-width="4"/>`),
+    p4: svg(`<path d="M56 8L24 54h22l-6 38 34-50H52z" fill="${W}"/>${t(70, 84, 26, '10')}`),
+    p5: svg(`<path d="M22 88V14" stroke-width="5"/><path d="M22 14h50l-10 14 10 14H22z" fill="${G}"/>${t(56, 76, 24, '×5')}`),
   };
 
   /* Enamel pin badges for ranks: a flat metal ground, ink outline, star count by rank. */

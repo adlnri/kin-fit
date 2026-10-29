@@ -105,6 +105,11 @@
     { id: 'a2', cat: 'amis', icon: 'check', n: 'Défi relevé', hint: 'Réussis un défi reçu ou lancé.', cond: (s) => s.social >= 1 },
     { id: 'a3', rare: true, cat: 'amis', icon: 'trophy', n: 'Trois relevés', hint: 'Réussis 3 défis entre amis.', cond: (s) => s.social >= 3 },
     { id: 'a4', cat: 'amis', icon: 'share', n: 'Ambassadeur', hint: 'Lance 5 défis.', cond: (s) => s.sent >= 5 },
+    { id: 'p1', cat: 'sport', icon: 'bolt', n: 'Premier parcours', hint: 'Termine ton premier parcours guidé.', cond: (s) => s.circuits >= 1 },
+    { id: 'p2', cat: 'cardio', icon: 'clock', n: 'Contre la montre', hint: 'Termine un parcours « pour le temps ».', cond: (s) => s.timed >= 1 },
+    { id: 'p3', rare: true, cat: 'sport', icon: 'trophy', n: 'Record battu', hint: 'Bats ton record sur un parcours.', cond: (s) => s.recBeats >= 1 },
+    { id: 'p4', cat: 'sport', icon: 'bolt', n: 'Dix parcours', hint: 'Termine 10 parcours guidés.', cond: (s) => s.circuits >= 10 },
+    { id: 'p5', rare: true, cat: 'cardio', icon: 'flag', n: 'Machine Hyrox', hint: 'Termine 5 Hyrox « pour le temps ».', cond: (s) => s.hyroxTimed >= 5 },
     { id: 'b1', cat: 'rang', rang: 'bronze', icon: 'trophy', n: 'Bronze', hint: 'Crée tes trophées.', cond: () => true },
     { id: 'b2', cat: 'rang', rang: 'argent', icon: 'trophy', n: 'Argent', hint: '200 points.', cond: (s) => s.points >= 200 },
     { id: 'b3', cat: 'rang', rang: 'or', icon: 'trophy', n: 'Or', hint: '500 points.', cond: (s) => s.points >= 500 },
@@ -207,23 +212,42 @@
 
   const socialCard = (x) => ({ key: `x:${x.id}`, cat: x.cat, icon: x.icon, pts: 50, title: x.title, desc: x.self ? 'Défi que tu as lancé' : `Défi de ${x.from}`, progress: x.progress || 0, target: x.target, unit: x.unit, mode: 'social', id: x.id, steps: x.steps, msg: x.msg, from: x.from, self: x.self });
 
-  function streakOf(sess) {
-    const plan = buildPlan(sess); let n = 0; const d = new Date(TODAY);
+  // A level per sport: every two weekly targets reached adds a level.
+  function sportLevels(sess) {
+    const p = sess.profile; const sports = p.sports.length ? p.sports.slice(0, 4) : [''];
+    const rows = sports.map((sp, i) => {
+      const per = Math.max(1, sportDefi(p, sp || undefined).target * 2);
+      const total = Object.entries(sess.sportCount).filter(([k]) => (i ? k.endsWith(`:${sp}`) : !k.includes(':'))).reduce((t, [, v]) => t + v, 0);
+      const lvl = 1 + Math.floor(total / per); const pct = Math.round(((total % per) / per) * 100);
+      return `<li><span class="lvl-n">${icon(SPORT_ICON[sp] || 'bolt')}<b>${esc(sp || 'Mon sport')}</b></span><span class="lvl-v">Niveau ${lvl}</span><span class="forme-bar"><i style="width:${pct}%"></i></span></li>`;
+    });
+    return `<article class="card lvl-card"><header class="card-head"><span class="chip-ico">${icon('star')}</span><div><h2 class="h2">Tes niveaux</h2><p class="muted">Chaque défi de sport te fait monter de niveau</p></div></header><ul class="lvl-list">${rows.join('')}</ul></article>`;
+  }
+
+  // Planned sessions done in a row. One joker per month covers a single missed session without breaking the series.
+  function streakInfo(sess) {
+    const plan = buildPlan(sess); let n = 0; const d = new Date(TODAY); const used = new Set();
     for (let i = 0; i < 180; i++) {
       const key = iso(d); if (key < sess.created) break;
       const it = plan.byDay((d.getDay() + 6) % 7);
-      if (it) { if (sess.done[doneKey(it, key)]) n++; else if (i > 0) break; }
+      if (it) {
+        if (sess.done[doneKey(it, key)]) n++;
+        else if (i > 0) { const m = key.slice(0, 7); if (n > 0 && !used.has(m)) used.add(m); else break; }
+      }
       d.setDate(d.getDate() - 1);
     }
-    return n;
+    return { n, joker: !used.has(iso(TODAY).slice(0, 7)) };
   }
+  const streakOf = (sess) => streakInfo(sess).n;
 
   function stats(sess) {
     const keys = Object.keys(sess.done); const c = (pre) => keys.filter((k) => k.startsWith(pre)).length;
+    const cl = Object.values(sess.log).flatMap((L) => (L && L.circuits) || []);
     return {
       seances: c('j:seance:') + c('j:cardio:'), cardio: c('j:cardio:'), mob: c('j:mob:'), pdj: c('j:pdj:'), eau: c('j:eau:'),
       weeks: c('s:seances:'), wpdj: c('s:pdj:'), weau: c('s:eau:'), sport: c('s:sport:'), social: c('x:'),
       sent: sess.sent.length, streakMax: sess.streakMax, points: sess.points,
+      circuits: cl.length, timed: cl.filter((x) => x.mode === 'temps').length, hyroxTimed: cl.filter((x) => x.type === 'hyrox' && x.mode === 'temps').length, recBeats: sess.recBeats || 0,
     };
   }
 
@@ -791,6 +815,7 @@
       <header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Déjeuner et dîner</h2><p class="muted">${esc(M.summary(sess.profile))}</p></div></header>
       ${dishBlock('Déjeuner', m.dej)}
       ${dishBlock('Dîner', m.diner)}
+      ${dayI === todayIdx && effortExtra(sess, iso(TODAY)) ? extraNote(effortExtra(sess, iso(TODAY))) : ''}
       ${m.snack ? `<p class="meal-snack"><span class="label">Collation</span> ${esc(m.snack.n)}</p>` : ''}
     </article>`;
   }
@@ -835,7 +860,7 @@
     const fresh = sess.inbox.filter((x) => x.status === 'new').length;
     return `<div class="scorebar">
       ${fresh ? `<button type="button" class="score score--inbox" data-goto="amis">${icon('inbox')}<b>${fresh}</b> défi${fresh > 1 ? 's' : ''} reçu${fresh > 1 ? 's' : ''}</button>` : ''}
-      <span class="score score--streak" title="Séances prévues réussies d’affilée">${icon('flame')}<b>${streak}</b> ${streak > 1 ? 'séances' : 'séance'} d’affilée</span>
+      <span class="score score--streak" title="Séances prévues réussies d’affilée. Un joker par mois protège ta série si tu manques une séance.">${icon('flame')}<b>${streak}</b> ${streak > 1 ? 'séances' : 'séance'} d’affilée${streak && streakInfo(sess).joker ? '<small class="joker">+1 joker</small>' : ''}</span>
       <span class="score score--pts">${icon('star')}<b>${sess.points}</b> pts${nx ? `<small> · ${nx.min - sess.points} avant ${nx.n}</small>` : ''}</span>
       <button type="button" class="score score--rang" data-view="album" aria-label="Rang ${r.n}, voir les trophées">${window.NA_BADGE ? window.NA_BADGE(r.id, true) : ''}${r.n}</button>
     </div>`;
@@ -911,7 +936,7 @@
     let body = '';
     if (ui.defisTab === 'jour') body = `<div class="defis">${dailyList(sess, todayIdx).map((c) => defiCard(c, sess)).join('')}</div>`;
     if (ui.defisTab === 'semaine') body = `<div class="defis">${w.semaine.map((c) => defiCard(c, sess)).join('')}</div>`;
-    if (ui.defisTab === 'sport') body = `<div class="defis">${w.sport.map((c) => defiCard(c, sess, { big: true })).join('')}</div><p class="hint">Ajoute tes répétitions après chaque entraînement de ${esc(sportName(sess.profile))}. L’objectif s’adapte à ton niveau${/genou/i.test(sess.profile.restrictions || '') ? ' et à ton genou' : ''}.</p>`;
+    if (ui.defisTab === 'sport') body = `${sportLevels(sess)}<div class="defis">${w.sport.map((c) => defiCard(c, sess, { big: true })).join('')}</div><p class="hint">Ajoute tes répétitions après chaque entraînement de ${esc(sportName(sess.profile))}. L’objectif s’adapte à ton niveau${/genou/i.test(sess.profile.restrictions || '') ? ' et à ton genou' : ''}.</p>`;
     if (ui.defisTab === 'amis') body = viewAmis(sess);
     if (ui.defisTab === 'trophees') body = viewAlbum(sess).replace(/^[\s\S]*?<\/header>/, '').replace(/<p class="foot">[\s\S]*$/, '');
     return `${pendingBanner()}
@@ -1167,17 +1192,29 @@
       <div class="stack">${omadOn(sess) ? '' : `<article class="card card--nutrition"><header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Déjeuner et dîner</h2><p class="muted">${esc(M.summary(sess.profile))}</p></div></header>${dishBlock('Déjeuner', m.dej)}${dishBlock('Dîner', m.diner)}${m.snack ? `<p class="meal-snack"><span class="label">Collation</span> ${esc(m.snack.n)}</p>` : ''}</article>`}${omadPromo(sess)}</div></div>${foot()}`);
   }
 
+  // Calories spent beyond the plan today (guided circuits, watch activities): added to dinner.
+  function effortExtra(sess, d) {
+    const L0 = sess.log[d] || {}; const p = sess.profile;
+    const circ = (L0.circuits || []).reduce((t, x) => t + (x.kcal || 0), 0);
+    const acts = ((sess.watch && sess.watch.acts) || []).filter((a) => a.day === d).reduce((t, a) => t + actKcal(a, p), 0);
+    const it = L0.auto ? buildPlan(sess).byDay(todayIdx) : null;
+    const kcal = Math.max(0, Math.round((circ + acts - (it && it.kcal ? it.kcal : 0)) / 10) * 10);
+    return kcal >= 80 ? { kcal, starch: Math.round((kcal * 0.6) / 1.3 / 10) * 10, prot: Math.round((kcal * 0.25) / 4) } : null;
+  }
+  const extraNote = (x) => `<p class="note note--effort">${icon('flame')}<span><b>+${x.kcal} kcal d’effort en plus aujourd’hui.</b> Ajoute-les au dîner : environ ${x.starch} g de féculents cuits en plus et ${x.prot} g de protéines.</span></p>`;
+
   function dayFoodCard(sess) {
     const p = sess.profile; const it = buildPlan(dayView(sess, todayIdx)).byDay(todayIdx); const L0 = lg(sess, iso(TODAY)); const eat = L0.eat || {};
     const b = breakfast(p, it ? 1.08 : 0.95); const m = mealsFor(sess, todayIdx);
     const rows = [['pdj', 'Petit-déjeuner', b.tot.k, !!L0.pdj], ['dej', 'Déjeuner', m.dej ? m.dej.k : 0, !!eat.dej], ['diner', 'Dîner', m.diner ? m.diner.k : 0, !!eat.diner], ['snack', 'Collation', Math.round(m.kcal * 0.1), !!eat.snack]];
     if (omadOn(sess)) rows.splice(0, rows.length, ['pdj', 'Repas unique', omadFor(sess, todayIdx).tot.k, !!L0.pdj]);
     (L0.photos || []).forEach((x) => { const r = rows.find((y) => y[0] === x.slot); if (r) { r[2] = x.kcal; r[3] = true; r[4] = x.plat; } else rows.push(['extra', 'Extra', x.kcal, true, x.plat]); });
+    const ex = effortExtra(sess, iso(TODAY)); if (ex) m.kcal += ex.kcal;
     const got = rows.reduce((t, r) => t + (r[3] ? r[2] : 0), 0); const C = 2 * Math.PI * 52; const f = Math.min(1, got / (m.kcal || 1));
     return `<article class="card food-day"><header class="card-head"><span class="chip-ico">${icon('flame')}</span><div><h2 class="h2">Ta journée</h2><p class="muted">${it ? 'Jour d’entraînement' : 'Jour de repos'} · besoin estimé ${m.kcal} kcal</p></div></header>
       <div class="food-top"><div class="hero-ring food-ring" role="img" aria-label="${got} kcal sur ${m.kcal}"><svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="food-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c6ff00"/><stop offset=".45" stop-color="#ff5fa8"/><stop offset="1" stop-color="#ff2e88"/></linearGradient></defs><circle class="ring-track" cx="60" cy="60" r="52"/><circle class="ring-val" cx="60" cy="60" r="52" stroke="url(#food-gold)" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - f)).toFixed(1)}"/></svg><p><b>${got}</b><span>sur ${m.kcal} kcal</span></p></div>
         <ul class="food-rows">${rows.map(([k, n, kc, ok, ph]) => k === 'extra' ? `<li class="is-on"><span><b>${n}</b><small>${icon('camera')} <span data-no-i18n>${esc(ph)}</span> · ${kc} kcal</small></span></li>` : `<li class="${ok ? 'is-on' : ''}"><span><b>${n}</b><small>${ph ? `${icon('camera')} <span data-no-i18n>${esc(ph)}</span> · ` : '≈ '}${kc} kcal</small></span><span class="food-acts">${k === 'dej' || k === 'diner' ? `${recipeBtn(m[k], 'link-btn')}<button type="button" class="link-btn" data-swap="${k}">Autre idée</button>` : ''}<button type="button" class="btn btn--${ok ? 'done' : 'cat'}" data-eat="${k}" aria-pressed="${ok}">${ok ? icon('check') + 'Mangé' : 'J’ai mangé ça'}</button></span></li>`).join('')}</ul></div>
-      <div class="meal-photo"><button type="button" class="btn btn--big btn--sheen" data-act="meal-photo">${icon('camera')}Photographier mon repas</button>${CLOUD.plus ? '' : '<span class="tag tag--plus">Plus</span>'}
+      ${ex ? extraNote(ex) : ''}<div class="meal-photo"><button type="button" class="btn btn--big btn--sheen" data-act="meal-photo">${icon('camera')}Photographier mon repas</button>${CLOUD.plus ? '' : '<span class="tag tag--plus">Plus</span>'}
         <input type="file" id="meal-file" accept="image/*" capture="environment" hidden></div>
     </article>`;
   }
@@ -2038,11 +2075,31 @@
     window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
   }
 
+  // Short spoken cues: technique once per exercise, encouragement, the last seconds, what is left.
+  function say(txt) {
+    const g = ui.guide; if (!g || !g.sound || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    const tr = (x) => (window.NA_I18N && window.NA_I18N.t ? window.NA_I18N.t(x) : x);
+    const lang = ['en', 'es'].includes(window.NA_I18N.lang) ? window.NA_I18N.lang : 'fr';
+    const u = new SpeechSynthesisUtterance(tr(txt)); u.lang = VOICE[lang]; u.rate = 1.05; window.speechSynthesis.speak(u);
+  }
+  const CHEER = ['Allez, tu tiens le rythme', 'Encore un effort', 'Reste propre jusqu’au bout', 'Respire, tu gères', 'Ne lâche rien'];
+  const techCue = (x) => { const t = (x && x.tech) || ''; return t.split(/[,.;]/)[0]; };
+  function coachCue(g, s) {
+    if (s.t === 'task') {
+      if (g.split === 40 && !g.cued[g.k]) { g.cued[g.k] = 1; const c = techCue(s.x); if (c) say(c); }
+      if (g.split > 0 && g.split % 120 === 0) say(CHEER[(g.k + g.split / 120) % CHEER.length]);
+      return;
+    }
+    if (!s.x || s.sec < 30) return;
+    if (g.left === Math.floor(s.sec / 2)) { if (!g.cued[g.k] && s.t !== 'run') { g.cued[g.k] = 1; const c = techCue(s.x); say(c || CHEER[g.k % CHEER.length]); } else say(s.t === 'run' ? 'Garde ton allure, relâche les épaules' : CHEER[g.k % CHEER.length]); }
+    if (g.left === 10) say('Dix secondes');
+  }
+
   function openCircuit() {
     const sess = cur(); if (!sess) return;
     const sv = dayView(sess, todayIdx); const p = sess.profile;
     const c = window.NA_CIRCUITS.build(p, ui.circuit, ui.circuitDur || durOf(p), cmodeOf(ui.circuit)); const segs = c.mode === 'temps' ? tempsSegs(c) : circuitSegs(c);
-    ui.guide = { kind: 'circuit', c, sv, segs, k: 0, left: segs[0].sec, total: segs.reduce((t, s) => t + s.sec, 0), spent: 0, clock: 0, split: 0, splits: [], phase: 'circuit', paused: true, started: false, sound: true,
+    ui.guide = { kind: 'circuit', c, sv, segs, k: 0, left: segs[0].sec, total: segs.reduce((t, s) => t + s.sec, 0), spent: 0, clock: 0, split: 0, splits: [], cued: {}, phase: 'circuit', paused: true, started: false, sound: true,
       item: { title: `Parcours ${c.name.toLowerCase()}`, kcal: c.kcal } };
     const old = $('#guide'); if (old) old.remove();
     const dlg = document.createElement('dialog'); dlg.id = 'guide'; dlg.className = 'dlg dlg--full guide guide--circuit'; dlg.setAttribute('aria-label', 'Parcours guidé');
@@ -2111,7 +2168,7 @@
     if (s.t === 'task') {
       g.clock += 1; g.split += 1; g.spent += 1;
       const a = $('#c-clock'); const b = $('#c-split'); if (a) a.textContent = mmss(g.clock); if (b) b.textContent = mmss(g.split);
-      return;
+      coachCue(g, s); return;
     }
     g.left = Math.max(0, g.left - 1); g.spent += 1;
     const C = 2 * Math.PI * 70;
@@ -2119,6 +2176,7 @@
     if (left) left.textContent = mmss(g.left);
     if (ring) ring.setAttribute('stroke-dashoffset', (C * (1 - g.left / s.sec)).toFixed(1));
     if (bar && g.c.mode !== 'temps') { const before = g.segs.slice(0, g.k).reduce((t, y) => t + y.sec, 0); bar.style.width = `${((before + s.sec - g.left) / g.total) * 100}%`; }
+    coachCue(g, s);
     if (g.left > 0 && g.left <= 3) beep(660, 140);
     if (g.left === 0) { beep(1046, 420); if (navigator.vibrate) navigator.vibrate([180, 80, 180]); circuitGo(g.k + 1); }
   }
@@ -2132,7 +2190,7 @@
       const tasks = g.segs.filter((y) => y.t === 'task').length; const key = recKey(c);
       sess.records = sess.records || {}; g.prevRec = sess.records[key] || null;
       // A record only counts when every exercise was validated.
-      if (g.splits.length >= tasks && g.final > 0 && (!g.prevRec || g.final < g.prevRec.t)) { g.newRecord = true; sess.records[key] = { t: g.final, at: new Date().toISOString(), splits: g.splits }; }
+      if (g.splits.length >= tasks && g.final > 0 && (!g.prevRec || g.final < g.prevRec.t)) { g.newRecord = true; if (g.prevRec) sess.recBeats = (sess.recBeats || 0) + 1; sess.records[key] = { t: g.final, at: new Date().toISOString(), splits: g.splits }; }
     }
     L0.circuits = (L0.circuits || []).concat({ type: c.type, mode: c.mode, duree: c.duree, min, kcal: g.item.kcal, time: c.mode === 'temps' ? g.final : null, at: new Date().toISOString() }); save();
     g.phase = 'done'; renderGuide(); celebrateGuide(); if (g.newRecord) sparks(innerWidth / 2, innerHeight / 2, 160, 1.1); beep(1318, 600);
@@ -2620,7 +2678,10 @@
     if (a === 'c-done' && ui.guide) {
       const g = ui.guide; const s = g.segs[g.k];
       g.splits = g.splits.filter((y) => y.k !== g.k).concat({ k: g.k, n: s.x.n, t: g.split });
-      beep(1046, 220); if (navigator.vibrate) navigator.vibrate(120); circuitGo(g.k + 1); return;
+      beep(1046, 220); if (navigator.vibrate) navigator.vibrate(120); circuitGo(g.k + 1);
+      const left = g.segs.slice(g.k).filter((y) => y.t === 'task').length;
+      if (left && left <= 4 && left % 2 === 0) setTimeout(() => say(`Plus que ${left} exercices`), 1800);
+      return;
     }
     if (a === 'c-prev' && ui.guide) { const g = ui.guide; circuitGo(g.left < g.segs[g.k].sec - 3 ? g.k : g.k - 1); return; }
     if (a === 'c-sound' && ui.guide) { ui.guide.sound = !ui.guide.sound; if (!ui.guide.sound && window.speechSynthesis) window.speechSynthesis.cancel(); renderGuide(); return; }

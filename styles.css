@@ -1100,4 +1100,13 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 .hx-curve circle { fill: var(--pink); }
 .hx-curve figcaption { color: var(--text-2); font-size: .9rem; }
 .field { display: grid; gap: 6px; } .field input { min-height: 48px; padding: 0 14px; border-radius: var(--r); border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text); color-scheme: dark; }
+/* Game layer */
+.joker { margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--amis) 22%, transparent); color: var(--amis); font-weight: 800; font-size: .72rem; }
+.lvl-list { display: grid; gap: 10px; }
+.lvl-list li { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+.lvl-n { display: inline-flex; align-items: center; gap: 8px; } .lvl-n .ico { color: var(--gold); width: 20px; height: 20px; }
+.lvl-v { font-weight: 800; color: var(--gold-hi); }
+.lvl-list .forme-bar { grid-column: 1 / -1; height: 8px; }
+.note--effort { display: flex; gap: 10px; align-items: flex-start; border-color: color-mix(in srgb, var(--nutrition) 50%, transparent); }
+.note--effort .ico { color: var(--nutrition); flex: none; }
 
