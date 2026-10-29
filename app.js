@@ -1054,6 +1054,7 @@
         ${c.knee ? '<p class="note">Genou signalé : les sauts sont remplacés par des versions sans impact.</p>' : ''}
         <dl class="facts">${c.facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
         <p>${esc(c.why)}</p>
+        <div class="actions c-start"><button type="button" class="btn btn--big btn--sheen" data-act="circuit-start">${icon('play')}Commencer le parcours</button></div>
         <section class="parcours-part"><h3 class="h3">Échauffement · ${c.warm} min</h3>${list(c.warmList)}</section>
         <section class="parcours-part"><h3 class="h3">${c.part}</h3>
           <ol class="exs">${c.stations.map((x, i) => { const d = x.id && window.NA_EXO ? window.NA_EXO.detail(x.id, p, x.v) : null; return `<li class="ex ex--station${x.run ? ' ex--run' : ''}">${d && d.photos ? `<button type="button" class="st-ph" data-exo="${x.id}" aria-label="Fiche : ${esc(x.n)}"><img src="${d.photos[1]}" alt="" loading="lazy" decoding="async"><span>${i + 1}</span></button>` : `<span class="ex-num">${i + 1}</span>`}<div class="ex-main">
@@ -1067,6 +1068,7 @@
             ${x.id ? `<div class="actions ex-acts"><button type="button" class="btn btn--glass" data-video="${x.id}" data-vkit="${['gym', 'dumb', 'band', 'body'].find((k) => E[x.id][k] === x.v) || ''}">${icon('play')}Vidéo explicative</button><button type="button" class="btn btn--ghost" data-exo="${x.id}">Voir la fiche</button></div>` : ''}</div></li>`; }).join('')}</ol></section>
         <section class="parcours-part"><h3 class="h3">Retour au calme · ${c.cool} min</h3>${list(c.coolList)}</section>
         <p class="hint">Bois quelques gorgées entre les tours. Si une position fait mal, passe à l’exercice suivant.</p>
+        <div class="actions c-start"><button type="button" class="btn btn--big btn--sheen" data-act="circuit-start">${icon('play')}Commencer le parcours</button></div>
       </article>${foot()}`;
   }
 
@@ -1784,7 +1786,9 @@
     if (g.phase === 'done') {
       endHr(g); const h = g.hrSum;
       const kcal = h ? h.kcal : g.kind === 'muscu' ? sessionMeta(g.item, p, sess.seed).kcal : g.item.kcal;
-      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">Séance terminée !</h2><p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : ''}≈ ${kcal} kcal dépensées</p>${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div>`;
+      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">${g.kind === 'circuit' ? 'Parcours terminé !' : 'Séance terminée !'}</h2><p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : g.kind === 'circuit' ? `${Math.max(1, Math.round(g.spent / 60))} min · ` : ''}≈ ${kcal} kcal dépensées</p>${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div>`;
+    } else if (g.kind === 'circuit') {
+      body = circuitBody(g, p, head);
     } else if (g.kind === 'cardio') {
       const it = g.item;
       body = `${head(((g.total - g.left) / g.total) * 100, it.title)}<div class="g-main"><h2 class="g-name">${esc(it.type)}</h2><p class="g-sub">${esc(it.format)}</p>
@@ -1814,6 +1818,7 @@
 
   function guideTick() {
     const g = ui.guide; if (!g) { clearInterval(guideTimer); return; }
+    if (g.kind === 'circuit') { circuitTick(g); return; }
     if (g.phase === 'cardio' && g.paused) return;
     g.left = Math.max(0, g.left - 1);
     const C = 2 * Math.PI * 70; const tot = g.phase === 'rest' ? g.restTotal : g.total;
@@ -1827,6 +1832,115 @@
   }
   const startTimer = () => { clearInterval(guideTimer); guideTimer = setInterval(guideTick, 1000); };
   function celebrateGuide() { if (navigator.vibrate) navigator.vibrate(300); sparks(innerWidth / 2, innerHeight / 3, 120, 0.9); }
+  /* ---------- Guided Parcours: every segment timed, with beeps, voice and what comes next ---------- */
+
+  const SEG = { warm: 'Échauffement', work: 'Effort', off: 'Récupération', round: 'Repos entre les tours', run: 'Course', station: 'Station', trans: 'Transition', cool: 'Retour au calme' };
+  function circuitSegs(c) {
+    const out = [{ t: 'warm', sec: c.warm * 60, list: c.warmList }];
+    if (c.timing) {
+      let b = 0;
+      c.stations.forEach((x, i) => {
+        if (x.run) { b += 1; out.push({ t: 'run', sec: c.timing.run, x, b }); return; }
+        out.push({ t: 'station', sec: c.timing.st, x, b });
+        if (i < c.stations.length - 1) out.push({ t: 'trans', sec: c.timing.tr, b });
+      });
+    } else {
+      for (let r = 1; r <= c.rounds; r++) {
+        c.stations.forEach((x, i) => {
+          out.push({ t: 'work', sec: c.pace.on, x, r });
+          if (i < c.stations.length - 1) out.push({ t: 'off', sec: c.pace.off, r });
+        });
+        if (r < c.rounds) out.push({ t: 'round', sec: c.pace.rest, r });
+      }
+    }
+    out.push({ t: 'cool', sec: c.cool * 60, list: c.coolList });
+    return out;
+  }
+
+  let actx = null;
+  function beep(f, ms) {
+    const g = ui.guide; if (!g || !g.sound) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator(); const v = actx.createGain(); const t = actx.currentTime;
+      o.type = 'sine'; o.frequency.value = f; v.gain.setValueAtTime(0.25, t); v.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+      o.connect(v).connect(actx.destination); o.start(t); o.stop(t + ms / 1000);
+    } catch (e) { /* no audio */ }
+  }
+  function announce() {
+    const g = ui.guide; if (!g || !g.sound || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    const s = g.segs[g.k]; const tr = (x) => (window.NA_I18N && window.NA_I18N.t ? window.NA_I18N.t(x) : x);
+    const nx = s.x ? null : g.segs.slice(g.k + 1).find((y) => y.x);
+    const sec = s.sec >= 120 ? `${Math.round(s.sec / 60)} minutes` : `${s.sec} secondes`;
+    const txt = s.x ? `${tr(s.x.n)}, ${sec}` : `${tr(SEG[s.t])}, ${sec}${nx && s.t !== 'warm' ? `. ${tr('Ensuite')} : ${tr(nx.x.n)}` : ''}`;
+    const lang = ['en', 'es'].includes(window.NA_I18N.lang) ? window.NA_I18N.lang : 'fr';
+    const u = new SpeechSynthesisUtterance(txt); u.lang = VOICE[lang]; u.rate = 1;
+    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+  }
+
+  function openCircuit() {
+    const sess = cur(); if (!sess) return;
+    const sv = dayView(sess, todayIdx); const p = sess.profile;
+    const c = window.NA_CIRCUITS.build(p, ui.circuit, ui.circuitDur || durOf(p)); const segs = circuitSegs(c);
+    ui.guide = { kind: 'circuit', c, sv, segs, k: 0, left: segs[0].sec, total: segs.reduce((t, s) => t + s.sec, 0), spent: 0, phase: 'circuit', paused: true, started: false, sound: true,
+      item: { title: `Parcours ${c.name.toLowerCase()}`, kcal: c.kcal } };
+    const old = $('#guide'); if (old) old.remove();
+    const dlg = document.createElement('dialog'); dlg.id = 'guide'; dlg.className = 'dlg dlg--full guide guide--circuit'; dlg.setAttribute('aria-label', 'Parcours guidé');
+    document.body.appendChild(dlg);
+    dlg.addEventListener('close', () => { clearInterval(guideTimer); keepAwake(false); if (window.speechSynthesis) window.speechSynthesis.cancel(); endHr(ui.guide); dlg.remove(); const s = cur(); ui.guide = null; if (s) { settle(s); render(); } });
+    if (W && W.linked) W.startRec();
+    renderGuide(); dlg.showModal(); keepAwake(true);
+  }
+
+  function circuitBody(g, p, head) {
+    const s = g.segs[g.k]; const c = g.c;
+    const before = g.segs.slice(0, g.k).reduce((t, y) => t + y.sec, 0);
+    const pct = ((before + s.sec - g.left) / g.total) * 100;
+    const nx = g.segs.slice(g.k + 1).find((y) => y.x);
+    const where = s.r ? `Tour ${s.r}/${c.rounds}` : s.b ? `Bloc ${s.b}/${c.stations.length / 2}` : '';
+    const d = s.x && s.x.id && window.NA_EXO ? window.NA_EXO.detail(s.x.id, p, s.x.v) : null;
+    const main = s.x
+      ? `<h2 class="g-name">${esc(s.x.n)}</h2><p class="g-load">${esc(s.x.load)}</p>${d && d.photos ? window.NA_EXO.anim(d, true) : ''}`
+      : s.list ? `<ul class="c-list">${s.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
+        : `<h2 class="g-name">Souffle</h2>`;
+    const toggle = g.paused ? (g.started ? 'Reprendre' : 'Démarrer') : 'Pause';
+    return `${head(pct, g.item.title)}<div class="g-main c-phase c-phase--${s.t}">
+      <p class="label c-label">${SEG[s.t]}${where ? ` · ${where}` : ''}</p>
+      ${main}
+      ${ringSvg(g.left / s.sec, mmss(g.left), g.paused && !g.started ? 'prêt ?' : 'restant')}
+      ${nx ? `<p class="g-next"><span>Ensuite :</span> <b>${esc(nx.x.n)}</b></p>` : ''}
+      <div class="actions g-actions c-ctl"><button type="button" class="round" data-act="c-prev" aria-label="Étape précédente">${icon('prev')}</button><button type="button" class="btn btn--big ${g.paused ? 'btn--sheen' : 'btn--ghost'}" data-act="c-toggle">${g.paused ? icon('play') : icon('pause')}${toggle}</button><button type="button" class="round" data-act="c-next" aria-label="Étape suivante">${icon('next')}</button><button type="button" class="round" data-act="c-sound" aria-pressed="${g.sound}" aria-label="Sons et voix">${icon('sound')}</button></div>
+      ${s.x && s.x.id ? `<button type="button" class="link-btn" data-video="${s.x.id}">${icon('play')}Voir la vidéo</button>` : ''}
+    </div>`;
+  }
+
+  function circuitGo(k) {
+    const g = ui.guide; if (!g) return;
+    if (k >= g.segs.length) { finishCircuit(); return; }
+    g.k = Math.max(0, k); g.left = g.segs[g.k].sec;
+    if (!g.paused) announce();
+    renderGuide();
+  }
+  function circuitTick(g) {
+    if (g.paused) return;
+    g.left = Math.max(0, g.left - 1); g.spent += 1;
+    const s = g.segs[g.k]; const C = 2 * Math.PI * 70;
+    const left = $('#g-left'); const ring = $('#g-ring'); const bar = $('#guide .g-bar i');
+    if (left) left.textContent = mmss(g.left);
+    if (ring) ring.setAttribute('stroke-dashoffset', (C * (1 - g.left / s.sec)).toFixed(1));
+    if (bar) { const before = g.segs.slice(0, g.k).reduce((t, y) => t + y.sec, 0); bar.style.width = `${((before + s.sec - g.left) / g.total) * 100}%`; }
+    if (g.left > 0 && g.left <= 3) beep(660, 140);
+    if (g.left === 0) { beep(1046, 420); if (navigator.vibrate) navigator.vibrate([180, 80, 180]); circuitGo(g.k + 1); }
+  }
+  function finishCircuit() {
+    const g = ui.guide; clearInterval(guideTimer); if (window.speechSynthesis) window.speechSynthesis.cancel();
+    const c = g.c; const min = Math.max(1, Math.round(g.spent / 60));
+    g.item.kcal = Math.round((c.kcal * g.spent) / (c.duree * 60) / 5) * 5;
+    const sess = cur(); const L0 = lg(sess, iso(TODAY));
+    L0.circuits = (L0.circuits || []).concat({ type: c.type, min, kcal: g.item.kcal, at: new Date().toISOString() }); save();
+    g.phase = 'done'; renderGuide(); celebrateGuide(); beep(1318, 600);
+  }
+
   function finishCardio() { const sess = cur(); const L0 = lg(sess, iso(TODAY)); L0.status = 'faite'; save(); ui.guide.phase = 'done'; clearInterval(guideTimer); renderGuide(); celebrateGuide(); }
 
   function openGive(id) {
@@ -2290,6 +2404,15 @@
     if (a === 'g-plus' && ui.guide) { ui.guide.left += 15; ui.guide.restTotal += 15; return; }
     if (a === 'g-toggle' && ui.guide) { ui.guide.paused = !ui.guide.paused; if (!ui.guide.paused) startTimer(); renderGuide(); return; }
     if (a === 'g-cardio-done' && ui.guide) { finishCardio(); return; }
+    if (a === 'circuit-start') { openCircuit(); return; }
+    if (a === 'c-toggle' && ui.guide) {
+      const g = ui.guide; g.paused = !g.paused;
+      if (!g.paused) { if (!g.started) { g.started = true; beep(880, 160); } announce(); startTimer(); } else if (window.speechSynthesis) window.speechSynthesis.cancel();
+      renderGuide(); return;
+    }
+    if (a === 'c-next' && ui.guide) { circuitGo(ui.guide.k + 1); return; }
+    if (a === 'c-prev' && ui.guide) { const g = ui.guide; circuitGo(g.left < g.segs[g.k].sec - 3 ? g.k : g.k - 1); return; }
+    if (a === 'c-sound' && ui.guide) { ui.guide.sound = !ui.guide.sound; if (!ui.guide.sound && window.speechSynthesis) window.speechSynthesis.cancel(); renderGuide(); return; }
     if (a === 'start') {
       const r = t.getBoundingClientRect(); sparks(r.left + r.width / 2, r.top + r.height / 2, 40, 0.5);
       const card = $('.today-grid .stack > .card'); if (!card) return;

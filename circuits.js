@@ -76,7 +76,7 @@
       seq.push({ ...leg, run: true, meta: knee ? runTxt : `${runTxt} · environ ${meters} m` });
       const s = station({ id }, 'auto', p); seq.push({ ...s, meta: `${st} s de station · ${s.load}` });
     });
-    return { rounds: 1, stations: seq, missing: false,
+    return { rounds: 1, stations: seq, missing: false, timing: { run: Math.round(run * 60), st, tr },
       sub: `${D} min · ${n} blocs course et station · ≈ ${NA.burnOf(T.met, p, D)} kcal`,
       part: `Les blocs · ${n} courses et ${n} stations`,
       facts: [['Course', knee ? `${mins} min` : `${mins} min · ${meters} m`], ['Station', `${st} s`], ['Transition', `${tr} s`], ['Blocs', String(n)]] };
