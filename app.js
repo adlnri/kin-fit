@@ -892,6 +892,7 @@
       <div class="today-grid">
         <div class="stack">${main}</div>
         <div class="stack">
+          ${ui.day === todayIdx ? formeCard(sess) : ''}
           ${watchDayCard(sess, ui.day)}
           ${breakfastCard(sess, item, L0, { readOnly: ro })}
           ${mealsCard(sess, ui.day)}
@@ -1458,6 +1459,38 @@
       ${CLOUD.enabled ? `<p class="label">Applications</p><ul class="food-rows watch-list">${row('strava')}${row('whoop')}</ul>
       ${!CLOUD.linked ? '<p class="hint">Crée ton compte Kin Fit gratuit pour relier Strava ou Whoop.</p>' : any ? `<div class="actions"><button type="button" class="btn btn--ghost" data-act="watch-sync">Synchroniser</button>${at ? `<span class="hint">Synchronisé · ${at}</span>` : ''}</div>` : ''}
       <p class="hint">Kin Fit lit seulement tes activités et, pour Whoop, ta récupération et ton sommeil. Rien n’est publié en ton nom, et tu peux délier à tout moment. Apple Watch : partage tes séances vers Strava pour les retrouver ici.</p>` : ''}
+    </article>`;
+  }
+
+  /* ---------- Forme du jour: what the body says today, and what to do with it ---------- */
+
+  function formeOf(sess) {
+    const d = iso(TODAY); const w = sess.watch || { rec: {} }; const rec = (w.rec || {})[d]; const c = todayCheck(sess);
+    const f = []; let s = rec ? rec.score : 70;
+    if (rec) f.push([`Récupération Whoop ${rec.score} %`, 0]);
+    if (rec && rec.sleep) { const v = rec.sleep >= 7.5 ? 5 : rec.sleep < 6 ? -10 : 0; if (v) f.push([`Sommeil ${String(rec.sleep).replace('.', ',')} h`, v]); s += v; }
+    if (c) { const v = { fatigue: -15, normal: 0, forme: 10 }[c.forme] || 0; if (v) f.push([c.forme === 'fatigue' ? 'Tu te sens fatigué' : 'Tu te sens en forme', v]); s += v; }
+    const days = [1, 2, 3].map((k) => { const x = new Date(TODAY); x.setDate(x.getDate() - k); return sess.log[iso(x)] || {}; });
+    const trained = days.filter((L) => L.status === 'faite' || (L.ex && L.ex.length) || (L.circuits && L.circuits.length)).length;
+    const load = trained >= 3 ? -15 : trained === 2 ? -5 : trained === 0 ? 5 : 0;
+    if (load) f.push([trained >= 3 ? '3 jours d’entraînement d’affilée' : trained === 2 ? '2 séances ces 3 derniers jours' : 'Bien reposé ces derniers jours', load]); s += load;
+    const y = days[0]; if (y.eau != null && (y.eau >= 6 || (y.eau <= 2 && ((y.ex && y.ex.length) || y.pdj || y.status)))) { const v = y.eau >= 6 ? 5 : -5; f.push([v > 0 ? 'Bien hydraté hier' : 'Peu d’eau hier', v]); s += v; }
+    s = Math.max(5, Math.min(99, Math.round(s)));
+    return { score: s, lvl: s >= 70 ? 'vert' : s >= 45 ? 'jaune' : 'rouge', factors: f, rec, check: c };
+  }
+  const FORME_TXT = { vert: ['Feu vert', 'Ton corps est prêt : fais ta séance comme prévu, et tente un record si tu en as envie.'],
+    jaune: ['Séance normale', 'Fais ta séance prévue sans chercher la performance. Écoute tes sensations sur la dernière série.'],
+    rouge: ['Séance allégée', 'Ton corps récupère encore : allège la séance ou fais 20 minutes de mobilité. Couche-toi tôt ce soir.'] };
+  function formeCard(sess) {
+    const f = formeOf(sess); const [title, txt] = FORME_TXT[f.lvl]; const c = f.check;
+    const act = f.lvl === 'rouge' && (!c || c.forme !== 'fatigue') ? '<button type="button" class="btn btn--ghost" data-act="forme-light">Alléger ma séance</button>'
+      : f.lvl === 'vert' && (!c || c.forme !== 'forme') ? '<button type="button" class="btn btn--ghost" data-act="forme-push">On pousse un peu</button>' : '';
+    return `<article class="card forme forme--${f.lvl}"><header class="card-head"><span class="chip-ico">${icon('bolt')}</span><div><h2 class="h2">Ta forme du jour</h2><p class="muted">${title}</p></div><p class="forme-score"><b>${f.score}</b><span>/100</span></p></header>
+      <div class="forme-bar" role="img" aria-label="Forme ${f.score} sur 100"><i style="width:${f.score}%"></i></div>
+      <p>${txt}</p>
+      ${f.factors.length ? `<ul class="forme-f">${f.factors.map(([l, v]) => `<li><span>${esc(l)}</span>${v ? `<b class="${v > 0 ? 'up' : 'down'}">${v > 0 ? '+' : '−'}${Math.abs(v)}</b>` : ''}</li>`).join('')}</ul>` : ''}
+      ${!f.rec && !c ? '<p class="hint">Réponds au « Combien de temps aujourd’hui ? » ou relie ton Whoop pour un score plus précis.</p>' : ''}
+      ${act ? `<div class="actions">${act}</div>` : ''}
     </article>`;
   }
 
@@ -2507,6 +2540,10 @@
     if (a === 'g-toggle' && ui.guide) { ui.guide.paused = !ui.guide.paused; if (!ui.guide.paused) startTimer(); renderGuide(); return; }
     if (a === 'g-cardio-done' && ui.guide) { finishCardio(); return; }
     if (a === 'g-share' && ui.guide) { shareCard(); return; }
+    if ((a === 'forme-light' || a === 'forme-push') && sess) {
+      const c = todayCheck(sess); sess.today = { date: iso(TODAY), min: c ? c.min : durOf(sess.profile), forme: a === 'forme-light' ? 'fatigue' : 'forme' };
+      save(); render(); toast(a === 'forme-light' ? 'Séance allégée pour aujourd’hui.' : 'Séance un cran plus intense aujourd’hui.'); return;
+    }
     if (a === 'circuit-start') { openCircuit(); return; }
     if (a === 'c-toggle' && ui.guide) {
       const g = ui.guide; g.paused = !g.paused;
