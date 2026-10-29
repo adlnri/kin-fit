@@ -21,7 +21,7 @@
       bas: 'Au football, la force des jambes se paie en accélérations et en duels gagnés.',
       haut: 'Un haut du corps solide protège le ballon et résiste aux charges à l’épaule.',
       tronc: 'Un tronc gainé transmet la puissance dans la frappe et les changements d’appui.',
-      cardio: { type: 'Intervalles navette 15/15', duree: 24, format: '15 s de sprint / 15 s de trot × 10, 3 blocs, 3 min de marche entre les blocs', obj: 'Répéter les sprints sans perdre de vitesse en fin de match', conseils: 'Pose deux plots à 20 m. Freine sur deux appuis avant chaque demi-tour, buste bas, et repars sur la jambe extérieure.', q: 'intervalles 15/15 football navette' },
+      cardio: { type: 'Intervalles navette 15/15', duree: 24, format: '15 s de sprint / 15 s de trot × 10, 3 blocs, 3 min de marche entre les blocs', obj: 'Répéter les sprints sans perdre de vitesse en fin de match', conseils: 'Pose deux plots à 20 m. Freine sur deux appuis avant chaque demi-tour, buste bas, et repars sur la jambe extérieure.', q: 'intervalles 15/15 football navette', vids: ['sprint', 'patineur'] },
       food: 'Le football alterne sprints et récupération : il faut des glucides complexes disponibles dès le matin.',
       tip: 'Garde 48 h entre la séance bas du corps et ton match.',
     },
@@ -29,7 +29,7 @@
       bas: 'En boxe, la frappe part du sol : des jambes fortes donnent des coups lourds.',
       haut: 'Épaules et dos endurants gardent la garde haute jusqu’au dernier round.',
       tronc: 'La rotation du tronc relie les appuis au poing et encaisse les coups au corps.',
-      cardio: { type: 'Corde à sauter et shadow en rounds', duree: 24, format: '3 min d’effort / 1 min de repos × 6 rounds', obj: 'Tenir le rythme d’un combat et récupérer en une minute', conseils: 'Rounds impairs à la corde, rounds pairs en shadow. Les 30 dernières secondes de chaque round se font à pleine cadence.', q: 'corde à sauter boxe rounds 3 minutes' },
+      cardio: { type: 'Corde à sauter et shadow en rounds', duree: 24, format: '3 min d’effort / 1 min de repos × 6 rounds', obj: 'Tenir le rythme d’un combat et récupérer en une minute', conseils: 'Rounds impairs à la corde, rounds pairs en shadow. Les 30 dernières secondes de chaque round se font à pleine cadence.', q: 'corde à sauter boxe rounds 3 minutes', vids: ['corde', 'shadow'] },
       food: 'Les rounds vident vite les réserves de glycogène : le petit-déjeuner les recharge sans alourdir.',
       tip: 'Travaille toujours la technique avant la musculation, jamais après.',
     },
@@ -37,7 +37,7 @@
       bas: 'Au paddle, tout se joue sur des fentes basses et des reprises d’appui explosives.',
       haut: 'La stabilité de l’épaule protège le bras de frappe sur les smashs répétés.',
       tronc: 'La rotation du buste donne de la vitesse à la balle sans forcer sur le bras.',
-      cardio: { type: 'HIIT déplacements latéraux', duree: 22, format: '20 s d’effort / 40 s de repos × 12, 2 blocs, 2 min entre les blocs', obj: 'Enchaîner les points longs en restant lucide à la volée', conseils: 'Pas chassés sur 4 m, touche le sol à chaque extrémité, garde le regard devant toi comme face au filet.', q: 'HIIT déplacements latéraux padel' },
+      cardio: { type: 'HIIT déplacements latéraux', duree: 22, format: '20 s d’effort / 40 s de repos × 12, 2 blocs, 2 min entre les blocs', obj: 'Enchaîner les points longs en restant lucide à la volée', conseils: 'Pas chassés sur 4 m, touche le sol à chaque extrémité, garde le regard devant toi comme face au filet.', q: 'HIIT déplacements latéraux padel', vids: ['patineur', 'genoux'] },
       food: 'Un match de paddle dure : il faut une énergie stable plutôt qu’un pic de sucre.',
       tip: 'Échauffe les épaules à l’élastique 5 minutes avant chaque match.',
     },
@@ -45,7 +45,7 @@
       bas: 'En natation, la poussée au mur et le battement dépendent de hanches puissantes.',
       haut: 'Dorsaux et épaules sont le moteur de chaque traction dans l’eau.',
       tronc: 'Le gainage maintient la ligne de corps et réduit la traînée.',
-      cardio: { type: 'Séries en bassin', duree: 35, format: '8 × 100 m allure soutenue, 20 s de récupération', obj: 'Améliorer l’endurance spécifique et tenir l’allure', conseils: 'Garde le même temps sur les huit répétitions. Si la huitième dérape de plus de 5 s, pars moins vite.', q: 'séries 8x100 natation allure' },
+      cardio: { type: 'Séries en bassin', duree: 35, format: '8 × 100 m allure soutenue, 20 s de récupération', obj: 'Améliorer l’endurance spécifique et tenir l’allure', conseils: 'Garde le même temps sur les huit répétitions. Si la huitième dérape de plus de 5 s, pars moins vite.', q: 'séries 8x100 natation allure', vids: [] },
       food: 'L’eau fait dépenser plus qu’on ne le sent : le matin doit apporter glucides et protéines.',
       tip: 'Mobilise les épaules chaque jour, même sans nager.',
     },
@@ -53,7 +53,7 @@
       bas: 'En JJB, des hanches fortes font les ponts, les balayages et les relevés.',
       haut: 'La force de tirage et de préhension tient les grips jusqu’à la soumission.',
       tronc: 'Le tronc résiste à la pression et garde la garde fermée.',
-      cardio: { type: 'Circuit grappling', duree: 30, format: '5 min d’effort / 1 min de repos × 5 rounds', obj: 'Tenir le rythme d’un combat de cinq minutes', conseils: 'Enchaîne sprawls, crevettes et relevés techniques. Respire par le nez tant que tu le peux.', q: 'circuit cardio JJB solo drills' },
+      cardio: { type: 'Circuit grappling', duree: 30, format: '5 min d’effort / 1 min de repos × 5 rounds', obj: 'Tenir le rythme d’un combat de cinq minutes', conseils: 'Enchaîne sprawls, crevettes et relevés techniques. Respire par le nez tant que tu le peux.', q: 'circuit cardio JJB solo drills', vids: ['burpee', 'climber'] },
       food: 'Les rounds de JJB mêlent force et endurance : protéines et glucides doivent être là tous les deux.',
       tip: 'Renforce ta nuque et tes avant-bras deux fois par semaine.',
     },
@@ -61,7 +61,7 @@
       bas: 'Au judo, la puissance des jambes fait entrer la projection.',
       haut: 'Le tirage et la saisie décident du kumi-kata.',
       tronc: 'La rotation du tronc termine le mouvement et résiste au déséquilibre.',
-      cardio: { type: 'Uchi-komi fractionné', duree: 20, format: '20 s d’effort / 10 s de repos × 8, 3 blocs, 2 min entre les blocs', obj: 'Reproduire l’intensité d’un combat et ses relances', conseils: 'Avec un élastique fixé à hauteur de poitrine, entre vite et propre. La qualité du placement passe avant le nombre.', q: 'uchi komi élastique tabata judo' },
+      cardio: { type: 'Uchi-komi fractionné', duree: 20, format: '20 s d’effort / 10 s de repos × 8, 3 blocs, 2 min entre les blocs', obj: 'Reproduire l’intensité d’un combat et ses relances', conseils: 'Avec un élastique fixé à hauteur de poitrine, entre vite et propre. La qualité du placement passe avant le nombre.', q: 'uchi komi élastique tabata judo', vids: ['row', 'burpee'] },
       food: 'Le judo demande de l’explosivité : un matin riche en protéines préserve le muscle.',
       tip: 'Travaille ton côté faible autant que ton côté fort.',
     },
@@ -69,7 +69,7 @@
       bas: 'Au handball, l’impulsion et les appuis décident du tir en suspension.',
       haut: 'Une épaule forte et stable protège le bras de tir.',
       tronc: 'Le tronc transmet la force du sol jusqu’au ballon.',
-      cardio: { type: 'Fractionné avec changements de direction', duree: 24, format: '30 s d’effort / 30 s de repos × 8, 2 blocs, 3 min entre les blocs', obj: 'Enchaîner montées de balle et replis défensifs', conseils: 'Course en zigzag entre des plots à 5 m. Freine fort, hanches basses, et accélère sur trois foulées.', q: 'fractionné 30/30 handball changements de direction' },
+      cardio: { type: 'Fractionné avec changements de direction', duree: 24, format: '30 s d’effort / 30 s de repos × 8, 2 blocs, 3 min entre les blocs', obj: 'Enchaîner montées de balle et replis défensifs', conseils: 'Course en zigzag entre des plots à 5 m. Freine fort, hanches basses, et accélère sur trois foulées.', q: 'fractionné 30/30 handball changements de direction', vids: ['sprint', 'patineur'] },
       food: 'Sprints, sauts et contacts : le handball réclame des glucides et des protéines dès le matin.',
       tip: 'Renforce la coiffe des rotateurs à chaque échauffement.',
     },
@@ -77,13 +77,13 @@
       bas: 'Des jambes fortes servent toutes les disciplines : elles portent, poussent et freinent.',
       haut: 'Un haut du corps équilibré entre poussée et tirage protège les épaules.',
       tronc: 'Le gainage transmet la force et protège le dos.',
-      cardio: { type: 'HIIT 40/20', duree: 20, format: '40 s d’effort / 20 s de repos × 5 tours de 4 exercices', obj: 'Améliorer l’endurance et renforcer le cœur', conseils: 'Montées de genoux, squats, grimpeur, fentes alternées. Garde un rythme que tu peux tenir cinq tours.', q: 'HIIT 40/20 débutant sans matériel' },
+      cardio: { type: 'HIIT 40/20', duree: 20, format: '40 s d’effort / 20 s de repos × 5 tours de 4 exercices', obj: 'Améliorer l’endurance et renforcer le cœur', conseils: 'Montées de genoux, squats, grimpeur, fentes alternées. Garde un rythme que tu peux tenir cinq tours.', q: 'HIIT 40/20 débutant sans matériel', vids: ['genoux', 'squat', 'climber', 'fente_av'] },
       food: 'Ton activité demande une énergie régulière : on mise sur des aliments simples et complets.',
       tip: 'La régularité bat l’intensité : mieux vaut trois séances tenues que cinq abandonnées.',
     },
   };
 
-  const ZONE2 = { type: 'Endurance fondamentale', duree: 35, format: '35 min en continu, allure où tu peux parler', obj: 'Construire la base aérobie et accélérer la récupération', conseils: 'Course, vélo ou rameur. Si tu ne peux plus dire une phrase entière, ralentis.', q: 'endurance fondamentale zone 2 explication' };
+  const ZONE2 = { type: 'Endurance fondamentale', duree: 35, format: '35 min en continu, allure où tu peux parler', obj: 'Construire la base aérobie et accélérer la récupération', conseils: 'Course, vélo ou rameur. Si tu ne peux plus dire une phrase entière, ralentis.', q: 'endurance fondamentale zone 2 explication', vids: ['course', 'velo', 'rameur'] };
 
   const BODY3 = ['3 s à la descente', '4 s à la descente', '4 s à la descente, pause 1 s en bas'];
 
@@ -149,7 +149,7 @@
     sumo: { m: "Adducteurs, fessiers, quadriceps", s: 3, r: 12, rest: 60, key: "bas", dumb: {"n": "Squat sumo haltère", "kg": 16}, body: {"n": "Squat sumo", "txt": ["Amplitude contrôlée", "Tempo lent, 3 s", "Tempo lent, pause 1 s"]}, tech: "Pieds très écartés, pointes ouvertes, descends droit en poussant les genoux vers l’extérieur.", err: "Les genoux qui rentrent vers l’intérieur." },
     jumpsq: { m: "Puissance des jambes, cardio", s: 3, r: 10, rest: 60, key: "bas", body: {"n": "Squat sauté", "txt": ["Petits sauts", "Sauts hauts", "Sauts hauts, réception tenue 1 s"]}, low: "Squat rapide sur la pointe des pieds", tech: "Descends en squat, saute en poussant fort, réceptionne-toi sur l’avant des pieds, genoux souples.", err: "Atterrir jambes tendues." },
     pont: { m: "Fessiers, ischio-jambiers", s: 3, r: 15, rest: 45, key: "bas", gym: {"n": "Pont fessier barre", "kg": 50}, body: {"n": "Pont fessier", "txt": ["Deux pieds au sol", "Pause 2 s en haut", "Sur une jambe"]}, tech: "Allongé, pieds près des fesses, pousse dans les talons pour monter le bassin et serre les fessiers en haut.", err: "Cambrer le bas du dos au lieu de serrer les fessiers." },
-    dips: { m: "Triceps, pectoraux", s: 3, r: 10, rest: 60, key: "haut", body: {"n": "Dips sur banc", "txt": ["Genoux pliés", "Jambes tendues", "Pieds surélevés"]}, tech: "Mains au bord du banc, coudes vers l’arrière, descends jusqu’à 90° puis pousse pour remonter.", err: "Les épaules qui remontent vers les oreilles." },
+    dips: { m: "Triceps, pectoraux", s: 3, r: 10, rest: 60, key: "haut", gym: {"n": "Dips aux barres parallèles", "txt": ["Assistés à l’élastique", "Poids du corps", "Lestés 5 à 10 kg"]}, body: {"n": "Dips sur banc", "txt": ["Genoux pliés", "Jambes tendues", "Pieds surélevés"]}, tech: "Mains au bord du banc, coudes vers l’arrière, descends jusqu’à 90° puis pousse pour remonter.", err: "Les épaules qui remontent vers les oreilles." },
     pompe_serree: { m: "Triceps, pectoraux", s: 3, r: 10, rest: 60, key: "haut", body: {"n": "Pompes serrées", "txt": ["Sur les genoux", "Classiques", "Descente en 3 s"]}, tech: "Mains sous les épaules, coudes collés au corps, corps gainé de la tête aux talons.", err: "Les coudes qui s’écartent." },
     curl: { m: "Biceps", s: 3, r: 12, rest: 60, key: "haut", gym: {"n": "Curl barre", "kg": 25}, dumb: {"n": "Curl haltères", "kg": 9, "per": " par main"}, band: {"n": "Curl à l’élastique", "txt": ["Élastique léger", "Élastique moyen", "Élastique fort"]}, body: {"n": "Curl avec sac chargé", "txt": ["Amplitude contrôlée", "Tempo lent, 3 s", "Tempo lent, pause 1 s"]}, tech: "Coudes collés aux côtes, monte la charge sans balancer le buste, redescends en 2 secondes.", err: "Balancer le dos pour monter la charge." },
     triceps: { m: "Triceps", s: 3, r: 12, rest: 60, key: "haut", gym: {"n": "Extension triceps à la poulie", "kg": 20}, dumb: {"n": "Extension triceps haltère", "kg": 10}, band: {"n": "Extension triceps à l’élastique", "txt": ["Élastique léger", "Élastique moyen", "Élastique fort"]}, body: {"n": "Extension triceps avec serviette", "txt": ["Amplitude contrôlée", "Tempo lent, 3 s", "Tempo lent, pause 1 s"]}, tech: "Coudes fixes près de la tête ou du corps, seul l’avant-bras bouge, tends complètement en expirant.", err: "Les coudes qui s’écartent." },
@@ -167,6 +167,14 @@
     corde: { m: "Mollets, coordination, cardio", s: 3, r: "30 s", rest: 30, key: "cardio", body: {"n": "Corde à sauter (ou sans corde)", "txt": ["Rythme modéré", "Rythme soutenu", "Rythme maximal"]}, low: "Marche rapide sur place", tech: "Petits sauts sur l’avant du pied, coudes près du corps, la rotation vient des poignets.", err: "Sauter trop haut et se fatiguer en deux minutes." },
     shadow: { m: "Épaules, gainage, cardio", s: 3, r: "30 s", rest: 30, key: "cardio", body: {"n": "Shadow boxing", "txt": ["Rythme modéré", "Rythme soutenu", "Rythme maximal"]}, low: "Shadow boxing pieds ancrés", tech: "Garde haute, enchaîne direct, crochet et uppercut en tournant les hanches, reste léger sur les appuis.", err: "Baisser la garde entre deux coups." },
     sprint: { m: "Cardio, mollets", s: 3, r: "30 s", rest: 30, key: "cardio", body: {"n": "Sprint sur place", "txt": ["Rythme modéré", "Rythme soutenu", "Rythme maximal"]}, low: "Marche rapide sur place en pompant les bras", tech: "Sur l’avant des pieds, bras à 90° qui pompent fort, fréquence maximale.", err: "Courir sur les talons." },
+    // Hyrox moves: the run between stations, the machines and the race stations.
+    course: { m: "Cardio, jambes", s: 1, r: "1 km", rest: 0, key: "cardio", body: {"n": "Course à pied", "txt": ["Allure facile", "Allure soutenue", "Allure de course"]}, low: "Marche rapide ou vélo", tech: "Foulée courte et rapide sous le bassin, buste légèrement penché vers l’avant, bras à 90° qui accompagnent.", err: "Partir trop vite sur la première course et le payer à chaque station." },
+    rameur: { m: "Dos, jambes, cardio", s: 1, r: "500 m", rest: 0, key: "cardio", gym: {"n": "Rameur", "txt": ["500 m", "750 m", "1 000 m"]}, tech: "Pousse d’abord avec les jambes, puis ouvre le buste et tire la poignée vers le bas des côtes ; reviens dans l’ordre inverse.", err: "Tirer avec les bras avant d’avoir poussé avec les jambes." },
+    velo: { m: "Cuisses, cardio", s: 1, r: "10 min", rest: 0, key: "cardio", gym: {"n": "Vélo d’appartement", "txt": ["Allure facile", "Allure soutenue", "Allure soutenue avec relances"]}, tech: "Selle à hauteur de hanche, genou presque tendu en bas du coup de pédale, cadence régulière autour de 85 tours par minute.", err: "Une selle trop basse qui fait travailler le genou." },
+    traineau: { m: "Jambes, fessiers, cardio", s: 3, r: "12 m", rest: 60, key: "cardio", gym: {"n": "Poussée de traîneau", "txt": ["Charge légère", "Charge moyenne", "Charge lourde"]}, tech: "Bras tendus ou coudes fléchis, corps penché à 45°, pousse avec de petits pas rapides sur l’avant du pied.", err: "Se redresser et pousser avec les bras plutôt qu’avec les jambes." },
+    wallball: { m: "Jambes, épaules, cardio", s: 3, r: 15, rest: 60, key: "cardio", gym: {"n": "Wall balls", "kg": 6}, body: {"n": "Squat et lancer de ballon", "txt": ["Ballon léger", "Ballon de 3 kg", "Ballon de 5 kg"]}, tech: "Ballon contre la poitrine, squat complet, puis lance-le vers une cible haute en tendant les jambes et les bras d’un seul geste.", err: "Lancer seulement avec les bras sans descendre en squat." },
+    swing: { m: "Fessiers, ischio-jambiers, cardio", s: 3, r: 15, rest: 60, key: "cardio", gym: {"n": "Kettlebell swing", "kg": 16}, dumb: {"n": "Swing haltère", "kg": 12}, tech: "Charnière de hanche, la charge passe entre les cuisses, puis claque les hanches vers l’avant pour la monter à hauteur d’épaules.", err: "Soulever la charge avec les bras ou le bas du dos." },
+    burpee_saut: { m: "Corps entier, puissance", s: 3, r: 10, rest: 60, key: "cardio", body: {"n": "Burpees sautés en longueur", "txt": ["Saut court", "Saut moyen", "Saut maximal"]}, low: "Burpees sans saut, suivis d’un grand pas en avant", tech: "Burpee complet, poitrine au sol, puis saute en avant à pieds joints et enchaîne le suivant à l’endroit de la réception.", err: "Réception jambes tendues, sans amortir." },
     chat: { m: "Colonne, dos", s: 2, r: "45 s", rest: 15, key: "mobilite", body: {"n": "Chat-vache", "txt": ["20 s par côté", "30 s par côté", "45 s par côté"]}, tech: "À quatre pattes, arrondis le dos en expirant puis creuse-le en inspirant, lentement.", err: "Aller trop vite et forcer en fin de mouvement." },
     enfant: { m: "Dos, hanches", s: 2, r: "45 s", rest: 15, key: "mobilite", body: {"n": "Posture de l’enfant", "txt": ["20 s par côté", "30 s par côté", "45 s par côté"]}, tech: "Fesses vers les talons, bras allongés devant, front au sol, respire dans le dos.", err: "Bloquer la respiration." },
     worlds: { m: "Hanches, dos, épaules", s: 2, r: "45 s", rest: 15, key: "mobilite", body: {"n": "Fente avec rotation", "txt": ["20 s par côté", "30 s par côté", "45 s par côté"]}, tech: "En grande fente, coude vers le pied avant, puis ouvre le bras vers le ciel en suivant la main des yeux.", err: "Laisser le genou arrière s’effondrer." },
@@ -265,8 +273,10 @@
 
   const lvLabel = (v) => (v < 34 ? 'Débutant' : v < 67 ? 'Intermédiaire' : 'Avancé');
   const lvIdx = (v) => (v < 34 ? 0 : v < 67 ? 1 : 2);
-  const sportName = (p) => p.sports[0] || p.autre || 'Sport';
-  const sportData = (p) => SPORT[p.sports[0]] || SPORT.Autre;
+  const sportName = (p) => (p.sports.length ? p.sports.join(', ').replace(/, ([^,]+)$/, ' et $1') : p.autre || 'Sport');
+  // Several sports: each one in turn (i is an exercise or day index), so none is left out.
+  const sportsOf = (p) => { const l = p.sports.filter((s) => SPORT[s]); return l.length ? l : ['Autre']; };
+  const sportData = (p, i = 0) => { const l = sportsOf(p); return SPORT[l[i % l.length]]; };
   const sportList = (p) => [...p.sports, p.autre].filter(Boolean).join(', ');
 
   function variant(ex, p) {
@@ -313,12 +323,14 @@
   function buildPlan(sess) {
     const p = sess.profile;
     const n = Math.min(6, Math.max(2, +p.seances || 3));
-    const sd = sportData(p);
-    let mi = 0; let ki = 0;
+    // Cardio days cycle through the cardio of each chosen sport, then an easy endurance day.
+    const cardios = [...new Set(sportsOf(p).map((s) => SPORT[s].cardio)), ZONE2];
+    // With more sports than cardio days, the starting sport moves on each week so every one comes up.
+    let mi = 0; let ki = cardios.length > 2 ? Math.floor(Date.now() / 6048e5) % cardios.length : 0;
     const items = ORDER[n].map((c, i) => {
       const day = DAYMAP[n][i];
       if (c === 'K') {
-        const k = ki++ % 2 === 0 ? sd.cardio : ZONE2;
+        const k = cardios[ki++ % cardios.length];
         const D = durOf(p); const extra = D - 10 - k.duree;
         const c = { ...k, kind: 'cardio', day, title: k.type };
         if (extra >= 5) { c.duree = D; c.format = `${k.format}. Échauffement 10 min, puis ${extra} min d’endurance facile pour finir`; }
@@ -382,5 +394,5 @@
 
 
   window.NA = { $, $$, esc, round, DUREES, durOf, burnOf, restOf, pairOf, FINISHER, SPORTS, OBJECTIFS, MATERIEL, PDJ, EVITER, DAYS, DAYS_FULL, SPORT, ZONE2, E, TPL, FOOD, BF, GOAL_FOOD, DRINK,
-    lvLabel, lvIdx, sportName, sportData, sportList, variant, loadText, setsReps, restrictionNote, buildPlan, sessionMeta, activity, dailyKcal, breakfast };
+    lvLabel, lvIdx, sportName, sportData, sportsOf, sportList, variant, loadText, setsReps, restrictionNote, buildPlan, sessionMeta, activity, dailyKcal, breakfast };
 })();

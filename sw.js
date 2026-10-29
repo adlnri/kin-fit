@@ -1,7 +1,7 @@
 /* Kin Fit service worker: offline app shell.
    Bump CACHE whenever the ?v= numbers in index.html change, so users get the new files. */
-const CACHE = 'kinfit-v49';
-const V = '?v=49';
+const CACHE = 'kinfit-v50';
+const V = '?v=50';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   `./styles.css${V}`, `./fonts/fonts.css${V}`,

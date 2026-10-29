@@ -1,5 +1,5 @@
-/* Kin Fit circuits: bodyweight, cardio and dumbbell "parcours" sized to a chosen duration and level.
-   Authored sample content; stations reuse the engine's exercises where they exist. */
+/* Kin Fit circuits: Hyrox-style runs and stations, bodyweight, cardio and dumbbell "parcours" sized to a
+   chosen duration and level. Authored sample content; stations reuse the engine's exercises where they exist. */
 (() => {
   'use strict';
 
@@ -19,6 +19,8 @@
 
   // Stations per circuit: engine exercises (id) or cardio moves (move).
   const TYPES = {
+    hyrox: { name: 'Hyrox', icon: 'bolt', kit: 'auto', met: 8.5, hyrox: true,
+      why: 'Comme une course Hyrox : une course avant chaque station, puis un exercice de force ou de puissance. Cardio, poids du corps et charges s’enchaînent, et le cœur ne redescend jamais vraiment.' },
     corps: { name: 'Poids du corps', icon: 'stretch', kit: 'corps', met: 7, stations: [{ id: 'squat' }, { id: 'bench' }, { id: 'fente_av' }, { id: 'row' }, { id: 'pont' }, { id: 'dips' }, { id: 'planche' }, { move: 'climber' }],
       why: 'Un parcours sans matériel qui alterne jambes, poussée, tirage et gainage : chaque groupe récupère pendant que le suivant travaille.' },
     cardio: { name: 'Cardio', icon: 'heart', kit: 'corps', met: 8, stations: [{ move: 'jacks' }, { move: 'genoux' }, { move: 'burpee' }, { move: 'climber' }, { move: 'patineur' }, { move: 'corde' }, { move: 'shadow' }, { move: 'sprint' }],
@@ -30,6 +32,15 @@
   TYPES.mobilite = { name: 'Mobilité', icon: 'stretch', kit: 'corps', met: 2.5, stations: [{ id: 'chat' }, { id: 'worlds' }, { id: 'psoas' }, { id: 'ischio' }, { id: 'pont' }, { id: 'superman' }, { id: 'enfant' }, { id: 'deadbug' }],
     why: 'Des positions tenues et des mouvements lents pour délier hanches, dos et épaules : parfait les jours de repos ou après une séance.' };
 
+  // Hyrox stations by equipment, most important first: the list is cut to the number of blocks.
+  const HYROX = {
+    salle: ['traineau', 'traction', 'burpee_saut', 'dips', 'rameur', 'wallball', 'farmer', 'fente_av'],
+    halteres: ['thruster', 'traction', 'burpee_saut', 'dips', 'swing', 'fente_av', 'farmer', 'climber'],
+    corps: ['burpee_saut', 'traction', 'jumpsq', 'dips', 'climber', 'fente_av', 'bench', 'planche'],
+  };
+  const SPEED = [9, 10.5, 12]; // km/h on the runs, by level
+  const STATION = [60, 75, 90]; // seconds per station, by level
+
   const WARM = ['Rotations des épaules et des hanches, 1 min', 'Marche puis trot sur place, 2 min', 'Squats et fentes lents à vide, 1 min', 'Montées de genoux légères, 1 min'];
   const COOL = ['Marche lente et respiration nasale, 2 min', 'Étirement des quadriceps et ischio-jambiers, 1 min', 'Étirement des pectoraux et du dos, 1 min', 'Respiration ventrale allongé, 1 min'];
   const PACE = [{ on: 30, off: 30, rest: 90 }, { on: 40, off: 20, rest: 75 }, { on: 45, off: 15, rest: 60 }]; // débutant, intermédiaire, avancé
@@ -39,24 +50,54 @@
     if (st.move) {
       const mv = MOVES[st.move]; const name = knee ? mv.low : mv.n;
       const ex = NA.E[st.move];
-      return { id: ex ? st.move : null, v: ex ? { n: name, txt: ex.body.txt } : null, n: name, m: mv.m, load: knee ? 'Sans impact' : 'Rythme soutenu', tech: mv.tech, err: mv.err, q: `${name} technique` };
+      return { id: ex ? st.move : null, v: ex ? { n: name, txt: ex.body.txt } : null, n: name, m: mv.m, load: knee ? 'Sans impact' : 'Rythme soutenu', tech: mv.tech, err: mv.err };
     }
     const ex = NA.E[st.id];
-    const v = kit === 'halteres' ? (ex.dumb || ex.body) : (ex.body || ex.band || ex.dumb);
-    return { id: st.id, v, n: v.n, m: ex.m, load: NA.loadText(v, p), tech: ex.tech, err: ex.err, q: `${v.n} technique` };
+    const v = kit === 'auto' ? NA.variant(ex, p) : kit === 'halteres' ? (ex.dumb || ex.body) : (ex.body || ex.band || ex.dumb);
+    if (knee && ex.low) return { id: st.id, v, n: ex.low, m: ex.m, load: 'Sans impact', tech: ex.tech, err: ex.err };
+    return { id: st.id, v, n: v.n, m: ex.m, load: NA.loadText(v, p), tech: ex.tech, err: ex.err };
+  }
+
+  // Hyrox: n blocks of one run then one station, in a single pass.
+  function hyrox(p, T, D, warm, cool) {
+    const m = p.materiel || []; const lv = NA.lvIdx(p.niveau);
+    const kit = m.includes('salle') ? 'salle' : m.includes('halteres') ? 'halteres' : 'corps';
+    const knee = /genou/i.test(p.restrictions || '');
+    const n = D <= 30 ? 4 : D <= 45 ? 6 : 8; const st = STATION[lv]; const tr = 30;
+    const per = ((D - warm - cool) * 60) / n;
+    const run = Math.max(1, Math.round((per - st - tr) / 30) / 2);
+    const meters = Math.round((run * SPEED[lv] * 1000) / 60 / 50) * 50;
+    const runId = knee && kit === 'salle' ? 'rameur' : 'course';
+    const leg = station({ id: runId }, 'auto', p);
+    const mins = String(run).replace('.', ',');
+    const runTxt = `${mins} min de ${runId === 'rameur' ? 'rameur' : knee ? 'marche rapide' : 'course'}`;
+    const seq = [];
+    HYROX[kit].slice(0, n).forEach((id) => {
+      seq.push({ ...leg, run: true, meta: knee ? runTxt : `${runTxt} · environ ${meters} m` });
+      const s = station({ id }, 'auto', p); seq.push({ ...s, meta: `${st} s de station · ${s.load}` });
+    });
+    return { rounds: 1, stations: seq, missing: false,
+      sub: `${D} min · ${n} blocs course et station · ≈ ${NA.burnOf(T.met, p, D)} kcal`,
+      part: `Les blocs · ${n} courses et ${n} stations`,
+      facts: [['Course', knee ? `${mins} min` : `${mins} min · ${meters} m`], ['Station', `${st} s`], ['Transition', `${tr} s`], ['Blocs', String(n)]] };
   }
 
   function build(p, type, dur) {
-    const T = TYPES[type] || TYPES.corps; const D = NA.DUREES.includes(+dur) ? +dur : NA.durOf(p);
+    const T = TYPES[type] || TYPES.hyrox; const D = NA.DUREES.includes(+dur) ? +dur : NA.durOf(p);
     const pace = PACE[NA.lvIdx(p.niveau)];
-    const n = D <= 30 ? 6 : 8;
     const warm = D >= 60 ? 8 : 5; const cool = D >= 60 ? 7 : 5;
+    const base = { type: TYPES[type] ? type : 'hyrox', name: T.name, icon: T.icon, why: T.why, duree: D, pace, warm, cool, kcal: NA.burnOf(T.met, p, D),
+      warmList: WARM, coolList: COOL, knee: /genou/i.test(p.restrictions || '') };
+    if (T.hyrox) return { ...base, ...hyrox(p, T, D, warm, cool) };
+    const n = D <= 30 ? 6 : 8;
     const lap = n * (pace.on + pace.off);
     const rounds = Math.max(2, Math.round(((D - warm - cool) * 60 + pace.rest) / (lap + pace.rest)));
-    const stations = T.stations.slice(0, n).map((st) => station(st, T.kit, p));
+    const stations = T.stations.slice(0, n).map((st) => { const s = station(st, T.kit, p); return { ...s, meta: `${pace.on} s d’effort · ${pace.off} s de repos · ${s.load}` }; });
     const missing = T.kit === 'halteres' && !p.materiel.some((m) => m === 'halteres' || m === 'salle');
-    return { type, name: T.name, icon: T.icon, why: T.why, duree: D, rounds, pace, stations, warm, cool, kcal: NA.burnOf(T.met, p, D),
-      warmList: WARM, coolList: COOL, missing, knee: /genou/i.test(p.restrictions || '') };
+    return { ...base, rounds, stations, missing,
+      sub: `${D} min · ${rounds} tours · ${stations.length} exercices · ≈ ${base.kcal} kcal`,
+      part: `Le circuit · ${rounds} tours`,
+      facts: [['Effort', `${pace.on} s`], ['Repos entre exercices', `${pace.off} s`], ['Repos entre les tours', `${pace.rest} s`], ['Tours', String(rounds)]] };
   }
 
   window.NA_CIRCUITS = { TYPES, build };

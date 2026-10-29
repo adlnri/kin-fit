@@ -3,7 +3,7 @@
 
   const {
     $, $$, esc, SPORTS, OBJECTIFS, MATERIEL, PDJ, EVITER, DAYS, DAYS_FULL, E, FOOD, GOAL_FOOD, DRINK,
-    lvLabel, lvIdx, sportName, sportData, sportList, variant, loadText, setsReps, restrictionNote,
+    lvLabel, lvIdx, sportName, sportData, sportsOf, sportList, variant, loadText, setsReps, restrictionNote,
     buildPlan, sessionMeta, activity, dailyKcal, breakfast, DUREES, durOf, restOf, pairOf, FINISHER,
   } = window.NA;
   const M = window.NA_MEALS;
@@ -146,15 +146,15 @@
   const cur = () => state.sessions.find((s) => s.id === state.current) || null;
   const lg = (sess, d) => { sess.log[d] = sess.log[d] || { ex: [], pdj: false, eau: 0, mob: false, status: '' }; return sess.log[d]; };
 
-  const ui = { view: 'today', day: todayIdx, ob: null, defisTab: 'jour', planTab: 'programme', confirmDelete: false, printing: false, aiBusy: null, circuit: 'corps', circuitDur: null };
+  const ui = { view: 'today', day: todayIdx, ob: null, defisTab: 'jour', planTab: 'programme', confirmDelete: false, printing: false, aiBusy: null, circuit: 'hyrox', circuitDur: null };
   const blank = () => ({ prenom: '', sexe: '', age: '', taille: '', poids: '', objectif: '', niveau: 50, seances: 3, duree: 60, materiel: [], restrictions: '', sports: [], autre: '', petitdej: '', eviter: [], regime: 'omni', pratiques: [], cheat: 1, budget: 'moyen', temps: 'libre' });
 
   /* ---------- Challenges ---------- */
 
   const doneKey = (it, d) => `j:${it.kind === 'muscu' ? 'seance' : 'cardio'}:${d}`;
 
-  function sportDefi(p) {
-    let s = SPORT_DEFI[p.sports[0]] || SPORT_DEFI.Autre;
+  function sportDefi(p, sport = p.sports[0]) {
+    let s = SPORT_DEFI[sport] || SPORT_DEFI.Autre;
     if (s.impact && /genou/i.test(p.restrictions || '')) s = SPORT_DEFI.Autre;
     return { ...s, target: Math.max(1, Math.round(s.base * [0.6, 1, 1.4][lvIdx(p.niveau)])) };
   }
@@ -189,16 +189,19 @@
     const seances = plan.items.filter((it) => sess.done[doneKey(it, days[it.day])]).length;
     const pdj = days.filter((d) => sess.done[`j:pdj:${d}`]).length;
     const eau = days.filter((d) => sess.done[`j:eau:${d}`]).length;
-    const sd = sportDefi(p);
+    // One weekly challenge per chosen sport; the first keeps the original counter key.
+    const sports = p.sports.length ? p.sports.slice(0, 4) : [''];
+    const sportCards = sports.map((sp, i) => {
+      const sd = sportDefi(p, sp || undefined); const ck = i ? `${weekId}:${sp}` : weekId;
+      return { key: i ? `s:sport:${weekId}:${sp}` : `s:sport:${weekId}`, cat: 'sport', icon: SPORT_ICON[sp] || 'bolt', pts: 60, title: `${sd.target} ${sd.unit}`, desc: `${sports.length > 1 ? `${sp} · ` : ''}${sd.t} sur la semaine. ${sd.why}`, progress: sess.sportCount[ck] || 0, target: sd.target, unit: sd.unit, mode: 'step', act: i ? `sport:${sp}` : 'sport', steps: sd.steps };
+    });
     return {
       semaine: [
         { key: `s:seances:${weekId}`, cat: 'sport', icon: 'calendar', pts: 80, title: `${n} séances sur ${n}`, desc: 'Toutes les séances prévues cette semaine', progress: seances, target: n, unit: 'séances', mode: 'auto', hint: 'Se remplit quand tu termines tes séances.' },
         { key: `s:pdj:${weekId}`, cat: 'nutrition', icon: 'bowl', pts: 40, title: 'Cinq matins bien partis', desc: 'Ton petit-déjeuner du plan 5 jours cette semaine', progress: pdj, target: 5, unit: 'matins', mode: 'auto', hint: 'Valide ton petit-déjeuner chaque matin.' },
         { key: `s:eau:${weekId}`, cat: 'eau', icon: 'drop', pts: 40, title: 'Quatre jours hydratés', desc: 'Objectif 2 litres atteint 4 jours', progress: eau, target: 4, unit: 'jours', mode: 'auto', hint: 'Remplis tes 8 verres dans Aujourd’hui.' },
       ],
-      sport: [
-        { key: `s:sport:${weekId}`, cat: 'sport', icon: SPORT_ICON[p.sports[0]] || 'bolt', pts: 60, title: `${sd.target} ${sd.unit}`, desc: `${sd.t} sur la semaine. ${sd.why}`, progress: sess.sportCount[weekId] || 0, target: sd.target, unit: sd.unit, mode: 'step', act: 'sport', steps: sd.steps },
-      ],
+      sport: sportCards,
     };
   }
 
@@ -384,7 +387,19 @@
 
   /* ---------- Shared pieces ---------- */
 
-  const yt = (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+  const vidBtn = (id, label, kit) => `<button type="button" class="btn btn--glass" data-video="${id}"${kit ? ` data-vkit="${kit}"` : ''}>${icon('play')}${label ? esc(label) : 'Vidéo explicative'}</button>`;
+
+  // The exercise of the library closest to a free name (AI sessions), for its in-app video.
+  const FOLD = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const EX_WORDS = [[/burpee/, 'burpee'], [/mountain|grimpeur|escalador/, 'climber'], [/jumping jack|star jump/, 'jacks'], [/corde|jump rope|comba|skipping rope/, 'corde'], [/shadow/, 'shadow'],
+    [/genoux|high knee|rodillas/, 'genoux'], [/patineur|skater|patinador/, 'patineur'], [/rameur|rowing machine|remo indoor|ergometre/, 'rameur'], [/velo|bike|cycling|bici/, 'velo'], [/course|run(ning)?|footing|jogging|carrera|correr/, 'course'],
+    [/traineau|sled|trineo/, 'traineau'], [/wall ball/, 'wallball'], [/swing/, 'swing'], [/thruster/, 'thruster'], [/traction|pull-?up|chin-?up|dominada/, 'traction'], [/dips?|fondos/, 'dips'],
+    [/souleve de terre roumain|romanian|rumano/, 'rdl'], [/souleve de terre|deadlift|peso muerto/, 'deadlift'], [/hip thrust/, 'hip'], [/pont|bridge|puente/, 'pont'], [/fente|lunge|zancada/, 'fente_av'],
+    [/step-?up/, 'stepup'], [/squat saute|jump squat|sentadilla con salto/, 'jumpsq'], [/sumo/, 'sumo'], [/squat|sentadilla/, 'squat'], [/mollet|calf|gemelo/, 'mollet'], [/planche laterale|side plank|plancha lateral/, 'planche_lat'],
+    [/planche|plank|plancha|gainage/, 'planche'], [/developpe couche|bench press|press de banca|pompe|push-?up|flexion/, 'bench'], [/militaire|shoulder press|overhead|press de hombro/, 'ohp'], [/tirage|pulldown|jalon/, 'pull'],
+    [/rowing|row\b|remo con/, 'row'], [/face pull/, 'face'], [/pallof/, 'pallof'], [/fermier|farmer|granjero/, 'farmer'], [/curl/, 'curl'], [/triceps/, 'triceps'], [/elevation|lateral raise|elevacion/, 'elev_lat'],
+    [/crunch/, 'crunch'], [/releve de jambes|leg raise/, 'releve'], [/superman/, 'superman'], [/dead ?bug/, 'deadbug'], [/rotation|twist|chop|giro/, 'chop'], [/battement|flutter/, 'flutter']];
+  function exMatch(name) { const s = FOLD(name); const w = EX_WORDS.find(([re]) => re.test(s)); return w && E[w[1]] ? w[1] : null; }
 
   function meter(c) {
     const v = Math.min(c.progress, c.target); const pct = Math.round((v / c.target) * 100);
@@ -449,12 +464,12 @@
       <p><b>Pourquoi cet exercice.</b> ${esc(sd[ex.key] || sd[key])}</p>
       <p><b>Explication.</b> ${esc(ex.tech)}</p>
       <p><b>Erreur à éviter.</b> ${esc(ex.err)}</p>
-      <p><a href="${yt(v.n + ' technique')}" target="_blank" rel="noopener">${icon('link')}Chercher « ${esc(v.n)} technique » sur YouTube</a></p>
+      <div class="actions ex-acts">${vidBtn(id)}</div>
     </div></details>`;
   }
 
   function exRow(id, i, sess, item, opts) {
-    const p = sess.profile; const ex = E[id]; const v = variant(ex, p); const sd = sportData(p);
+    const p = sess.profile; const ex = E[id]; const v = variant(ex, p); const sd = sportData(p, i);
     const checked = opts.log && opts.log.ex.includes(id);
     const pair = pairOf(i, item.ex.length, p);
     const rest = pair && pair.first ? 'enchaîne avec le B' : `repos ${restOf(ex, p)} s`;
@@ -494,7 +509,7 @@
       ${note ? `<p class="note">${esc(note)}</p>` : ''}
       <dl class="facts"><div><dt>Format</dt><dd>${esc(item.format)}</dd></div><div><dt>Objectif</dt><dd>${esc(item.obj)}</dd></div></dl>
       <p><b>Conseils techniques :</b> ${esc(item.conseils)}</p>
-      <p><a href="${yt(item.q)}" target="_blank" rel="noopener">${icon('link')}Chercher « ${esc(item.q)} » sur YouTube</a></p>
+      ${(item.vids || []).length ? `<div class="actions ex-acts">${item.vids.filter((id) => E[id]).map((id) => vidBtn(id, variant(E[id], sess.profile).n)).join('')}</div>` : ''}
       ${opts.check && !opts.readOnly ? `<div class="card-foot"><button type="button" class="btn btn--${done ? 'done' : 'cat'}" data-tap="cardio" aria-pressed="${done}">${done ? icon('check') + 'Cardio terminé' : 'J’ai terminé mon cardio'}</button>${done && L0.auto ? `<span class="hint">Validé par ${L0.auto === 'whoop' ? 'Whoop' : 'Strava'}</span>` : ''}</div>` : ''}
     </article>`;
   }
@@ -506,7 +521,7 @@
       <header class="card-head"><span class="chip-ico">${icon('stretch')}</span><div><h2 class="h2">${title}</h2><p class="muted">Repos actif</p></div></header>
       <p><b>Étirements recommandés :</b> fléchisseurs de hanche, ischio-jambiers, pectoraux, dorsaux, mollets. 30 secondes par zone, deux passages.</p>
       <p><b>Récupération :</b> environ ${eau} litres d’eau par jour, 7 à 9 heures de sommeil, 10 minutes de mobilité les jours sans séance, un jour de repos complet par semaine.</p>
-      <p><b>Astuce pro :</b> ${esc(sportData(p).tip)}</p>
+      <p><b>Astuce pro :</b> ${esc(sportData(p, todayIdx).tip)}</p>
       ${L0 && !opts.readOnly ? `<div class="card-foot"><button type="button" class="btn btn--${L0.mob ? 'done' : 'cat'}" data-tap="mob" aria-pressed="${L0.mob}">${L0.mob ? icon('check') + 'Mobilité faite' : 'J’ai fait mes 10 minutes'}</button></div>` : ''}
     </article>`;
   }
@@ -536,12 +551,12 @@
           <h4>${ai(x.nom)}</h4>
           <p class="ex-meta">${x.series} × ${ai(x.repetitions)} · <span>repos ${x.repos_sec} s</span> · ${ai(x.poids)}</p>
           <p class="ex-muscle">${ai(x.muscle)}</p>
-          <details><summary>Pourquoi, technique, vidéo</summary><div class="more">
+          <details><summary>Pourquoi et technique</summary><div class="more">
             <p><b>Pourquoi cet exercice.</b> ${ai(x.pourquoi)}</p>
             <p><b>Explication.</b> ${ai(x.explication)}</p>
             <p><b>Erreur à éviter.</b> ${ai(x.erreur)}</p>
-            <p><a href="${yt(x.video_recherche)}" target="_blank" rel="noopener">${icon('link')}<span>YouTube</span> · ${ai(x.video_recherche)}</a></p>
           </div></details>
+          ${exMatch(x.nom) ? `<div class="actions ex-acts">${vidBtn(exMatch(x.nom))}<button type="button" class="btn btn--ghost" data-exo="${exMatch(x.nom)}">Voir la fiche</button></div>` : ''}
         </div></li>`).join('')}</ol>
     </article>`;
   }
@@ -553,7 +568,7 @@
       <dl class="facts"><div><dt>Format</dt><dd>${ai(d.format)}</dd></div><div><dt>Objectif</dt><dd>${ai(d.objectif)}</dd></div></dl>
       <p><b>Conseils techniques :</b> ${ai(d.conseils)}</p>
       <p><b>Pourquoi :</b> ${ai(d.pourquoi)}</p>
-      <p><a href="${yt(d.video_recherche)}" target="_blank" rel="noopener">${icon('link')}<span>YouTube</span> · ${ai(d.video_recherche)}</a></p>
+      ${exMatch(d.type) ? `<div class="actions ex-acts">${vidBtn(exMatch(d.type))}</div>` : ''}
     </article>`;
   }
 
@@ -625,7 +640,7 @@
       </dl>
       <div class="macro-bar" role="img" aria-label="Répartition des calories : protéines ${pc(kc.p)} %, glucides ${pc(kc.g)} %, lipides ${pc(kc.l)} %"><i class="p" style="width:${pc(kc.p)}%"></i><i class="g" style="width:${pc(kc.g)}%"></i><i class="l" style="width:${pc(kc.l)}%"></i></div>
       <ul class="ingr">${b.items.map((it) => `<li><span>${esc(FOOD[it.id].n + (it.id === 'dinde' ? b.meat : ''))}</span><b>${gramsLabel(it)}</b></li>`).join('')}</ul>
-      ${opts.full ? `<p><b>Explication :</b> ${esc(b.tpl.why)} ${esc(sportData(p).food)} ${esc(GOAL_FOOD[p.objectif])}</p>` : ''}
+      ${opts.full ? `<p><b>Explication :</b> ${esc(b.tpl.why)} ${esc([...new Set(sportsOf(p).map((s, i) => sportData(p, i).food))].join(' '))} ${esc(GOAL_FOOD[p.objectif])}</p>` : ''}
       <p><b>Boisson :</b> ${esc(drink)}.</p>
       <p><b>Alternative rapide :</b> ${esc(quick)}</p>
       ${opts.full || !L0 ? '' : ''}${altList(M.breakfastAlts(p, b.items))}
@@ -1034,21 +1049,20 @@
         <div class="seg" role="group" aria-label="Durée du parcours">${DUREES.map((n) => `<button type="button" data-cdur="${n}" aria-pressed="${n === c.duree}">${n} min</button>`).join('')}</div>
       </div>
       <article class="card card--sport parcours">
-        <header class="card-head"><span class="chip-ico">${icon(c.icon)}</span><div><h2 class="h2">Parcours ${c.name.toLowerCase()}</h2><p class="muted">${c.duree} min · ${c.rounds} tours · ${c.stations.length} exercices · ≈ ${c.kcal} kcal</p></div></header>
+        <header class="card-head"><span class="chip-ico">${icon(c.icon)}</span><div><h2 class="h2">Parcours ${c.name.toLowerCase()}</h2><p class="muted">${c.sub}</p></div></header>
         ${c.missing ? '<p class="note">Il te faut une paire d’haltères. Pour débuter, des bouteilles d’eau ou un sac chargé font l’affaire.</p>' : ''}
         ${c.knee ? '<p class="note">Genou signalé : les sauts sont remplacés par des versions sans impact.</p>' : ''}
-        <dl class="facts"><div><dt>Effort</dt><dd>${c.pace.on} s</dd></div><div><dt>Repos entre exercices</dt><dd>${c.pace.off} s</dd></div><div><dt>Repos entre les tours</dt><dd>${c.pace.rest} s</dd></div><div><dt>Tours</dt><dd>${c.rounds}</dd></div></dl>
+        <dl class="facts">${c.facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
         <p>${esc(c.why)}</p>
         <section class="parcours-part"><h3 class="h3">Échauffement · ${c.warm} min</h3>${list(c.warmList)}</section>
-        <section class="parcours-part"><h3 class="h3">Le circuit · ${c.rounds} tours</h3>
-          <ol class="exs">${c.stations.map((x, i) => { const d = x.id && window.NA_EXO ? window.NA_EXO.detail(x.id, p, x.v) : null; return `<li class="ex ex--station">${d && d.photos ? `<button type="button" class="st-ph" data-exo="${x.id}" aria-label="Fiche : ${esc(x.n)}"><img src="${d.photos[1]}" alt="" loading="lazy" decoding="async"><span>${i + 1}</span></button>` : `<span class="ex-num">${i + 1}</span>`}<div class="ex-main">
+        <section class="parcours-part"><h3 class="h3">${c.part}</h3>
+          <ol class="exs">${c.stations.map((x, i) => { const d = x.id && window.NA_EXO ? window.NA_EXO.detail(x.id, p, x.v) : null; return `<li class="ex ex--station${x.run ? ' ex--run' : ''}">${d && d.photos ? `<button type="button" class="st-ph" data-exo="${x.id}" aria-label="Fiche : ${esc(x.n)}"><img src="${d.photos[1]}" alt="" loading="lazy" decoding="async"><span>${i + 1}</span></button>` : `<span class="ex-num">${i + 1}</span>`}<div class="ex-main">
             <h4>${esc(x.n)}</h4>
-            <p class="ex-meta">${c.pace.on} s d’effort · ${c.pace.off} s de repos · ${esc(x.load)}</p>
+            <p class="ex-meta">${esc(x.meta)}</p>
             <p class="ex-muscle">${esc(x.m)}</p>
-            <details><summary>Technique et vidéo</summary><div class="more">
+            <details><summary>Technique</summary><div class="more">
               <p><b>Explication.</b> ${esc(x.tech)}</p>
               <p><b>Erreur à éviter.</b> ${esc(x.err)}</p>
-              <p><a href="${yt(x.q)}" target="_blank" rel="noopener">${icon('link')}Chercher « ${esc(x.q)} » sur YouTube</a></p>
             </div></details>
             ${x.id ? `<div class="actions ex-acts"><button type="button" class="btn btn--glass" data-video="${x.id}" data-vkit="${['gym', 'dumb', 'band', 'body'].find((k) => E[x.id][k] === x.v) || ''}">${icon('play')}Vidéo explicative</button><button type="button" class="btn btn--ghost" data-exo="${x.id}">Voir la fiche</button></div>` : ''}</div></li>`; }).join('')}</ol></section>
         <section class="parcours-part"><h3 class="h3">Retour au calme · ${c.cool} min</h3>${list(c.coolList)}</section>
@@ -1602,7 +1616,6 @@
       <p class="note"><b>Erreur à éviter.</b> ${esc(d.err)}</p>
       <div class="exo-vars"><div><p class="label">Plus facile</p><p data-no-i18n>${esc(d.easy)}</p></div><div><p class="label">Plus dur</p><p data-no-i18n>${esc(d.hard)}</p></div></div>
       <p><b>Pourquoi pour ton sport.</b> ${esc(sd[ex.key] || '')}</p>
-      <p><a href="${yt(d.name + ' technique')}" target="_blank" rel="noopener">${icon('link')}Chercher « ${esc(d.name)} technique » sur YouTube</a></p>
     </div>`;
     document.body.appendChild(dlg);
     dlg.addEventListener('close', () => dlg.remove());
@@ -2108,8 +2121,9 @@
       settle(sess); render(); refocus(`[data-eau="${n}"]`); return;
     }
     if (t.dataset.step && sess) {
-      const n = +t.dataset.step.split('|')[1];
-      sess.sportCount[weekId] = Math.max(0, (sess.sportCount[weekId] || 0) + n);
+      const [act, v] = t.dataset.step.split('|'); const n = +v;
+      const ck = act.startsWith('sport:') ? `${weekId}:${act.slice(6)}` : weekId;
+      sess.sportCount[ck] = Math.max(0, (sess.sportCount[ck] || 0) + n);
       settle(sess); render(); refocus(`[data-step="${t.dataset.step}"]`); return;
     }
     if (t.dataset.sstep && sess) {
