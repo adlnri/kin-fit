@@ -110,6 +110,7 @@
   /* ---------- Shared challenges ---------- */
 
   const challenges = () => rpc('my_challenges');
+  const board = () => rpc('friends_board'); // supabase/social.sql
   const createChallenge = (c, msg, friendIds) => rpc('create_challenge', { p_cid: c.cid, p_title: c.title, p_unit: c.unit, p_target: c.target, p_cat: c.cat, p_icon: c.icon, p_steps: c.steps, p_msg: msg || '', p_friends: friendIds });
   async function setProgress(id, progress) { const c = await sb(); check(await c.from('challenge_members').update({ progress, updated_at: new Date().toISOString() }).eq('challenge_id', id).eq('user_id', st.user.id)); }
   async function respond(id, status) { const c = await sb(); check(await c.from('challenge_members').update({ status, updated_at: new Date().toISOString() }).eq('challenge_id', id).eq('user_id', st.user.id)); }
@@ -137,6 +138,6 @@
     start, onChange: (f) => st.listeners.push(f),
     signInEmail, signInGoogle, signOut, createProfile, push, pull,
     friends, requestFriend, acceptFriend, removeFriend,
-    challenges, createChallenge, setProgress, respond, exportData, deleteAccount,
+    challenges, createChallenge, setProgress, respond, board, exportData, deleteAccount,
   };
 })();

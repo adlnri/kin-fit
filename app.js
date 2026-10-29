@@ -254,11 +254,12 @@
   function settle(sess, quiet) {
     const gained = { pts: 0, defis: [], stickers: [], dupes: [] }; const won = [];
     const w = weekList(sess);
-    const list = [...dailyList(sess, todayIdx), ...w.semaine, ...w.sport, ...sess.inbox.filter((x) => x.status === 'accepted').map(socialCard)];
+    const list = [...dailyList(sess, todayIdx), ...w.semaine, ...w.sport, ...sess.inbox.filter((x) => x.status === 'accepted' && !isDuel(x)).map(socialCard)];
     if (ui.day < todayIdx) list.push(...dailyList(sess, ui.day));
     list.forEach((c) => {
       if (c.progress >= c.target && !sess.done[c.key]) { sess.done[c.key] = iso(TODAY); sess.points += c.pts; gained.pts += c.pts; gained.defis.push(c.title); won.push(c); }
     });
+    if (gained.pts) { const wp = sess.weekPts && sess.weekPts.id === weekId ? sess.weekPts : { id: weekId, pts: 0 }; wp.pts += gained.pts; sess.weekPts = wp; }
     sess.streakMax = Math.max(sess.streakMax, streakOf(sess));
     const before = [...sess.stickers];
     const st = stats(sess);
@@ -297,6 +298,7 @@
   // The app link; with an account it carries the pseudo so the friend can add you in one tap.
   const inviteLink = () => `${appUrl()}${myPseudo() ? `#ami=${encodeURIComponent(myPseudo())}` : ''}`;
 
+  const isDuel = (x) => String(x.cid || '').startsWith('duel:');
   function addToInbox(sess, entry) {
     if (sess.inbox.some((x) => x.id === entry.id)) return false;
     sess.inbox.unshift(entry); return true;
@@ -957,16 +959,56 @@
 
   function viewAmis(sess) {
     const fresh = sess.inbox.filter((x) => x.status === 'new');
-    const active = sess.inbox.filter((x) => x.status === 'accepted');
+    const active = sess.inbox.filter((x) => x.status === 'accepted' && !isDuel(x));
+    const duels = sess.inbox.filter((x) => x.status === 'accepted' && isDuel(x));
     return `${friendsBlock()}<div class="amis-head"><p>Lance un défi à quelqu’un sur cet appareil ou partage-le par lien. Chacun suit sa progression, et le premier arrivé gagne la médaille.</p>
         <button type="button" class="btn btn--amis" data-act="launch">${icon('send')}Lancer un défi</button></div>
       ${fresh.length ? `<h2 class="h3">Défis reçus</h2><div class="defis">${fresh.map((x) => `<article class="defi defi--${x.cat} is-invite">
         <div class="defi-badge">${icon(x.icon)}</div><div class="defi-body"><div class="defi-top"><h3>${esc(x.title)}</h3><span class="pts">+50 pts</span></div>
         <p class="defi-desc">De la part de ${esc(x.from)}</p>${x.msg ? `<p class="defi-msg">« ${esc(x.msg)} »</p>` : ''}
         <div class="actions"><button type="button" class="btn btn--cat" data-accept="${x.id}">Relever le défi</button><button type="button" class="btn btn--ghost" data-decline="${x.id}">Refuser</button></div></div></article>`).join('')}</div>` : ''}
+      ${boardCard()}
+      ${duels.length ? `<h2 class="h3">Défis chrono</h2><div class="defis">${duels.map(duelCard).join('')}</div>` : ''}
       <h2 class="h3">En cours</h2>
       ${active.length ? `<div class="defis">${active.map((x) => defiCard(socialCard(x), sess, { extra: participants(x) + (x.cloud ? '' : `<button type="button" class="link-btn" data-copy="${x.id}">${icon('link')}Copier le lien du défi</button>`) })).join('')}</div>` : `<p class="empty">Aucun défi entre amis pour l’instant. Lance le premier !</p>`}
       ${sess.sent.length ? `<h2 class="h3">Envoyés</h2><ul class="sent">${sess.sent.slice(0, 8).map((x) => `<li>${icon('send')}<span><b>${esc(x.title)}</b> à ${esc(x.to)}</span></li>`).join('')}</ul>` : ''}`;
+  }
+
+  // A time duel: everyone runs the same Parcours "pour le temps"; the lowest time leads.
+  const duelOf = (x) => { const [, type, duree] = String(x.cid).split(':'); return { type, duree: +duree }; };
+  function duelTimes(x) {
+    return (x.members || []).filter((m) => m.status !== 'declined').map((m) => ({ n: m.pseudo, t: m.me ? x.progress || 0 : m.progress || 0, me: m.me }))
+      .sort((a, b) => (a.t || 1e9) - (b.t || 1e9));
+  }
+  function duelGhost(x) { const o = duelTimes(x).filter((m) => !m.me && m.t); return o.length ? o[0] : x.self ? null : { n: x.from, t: x.target }; }
+  function duelCard(x) {
+    const d = duelOf(x); const T = window.NA_CIRCUITS.TYPES[d.type] || {}; const g = duelGhost(x); const rows = duelTimes(x);
+    return `<article class="defi defi--sport duel-card"><div class="defi-badge">${icon('clock')}</div><div class="defi-body">
+      <div class="defi-top"><h3>Parcours ${esc((T.name || d.type).toLowerCase())} · ${d.duree} min</h3><span class="pts">+50 pts</span></div>
+      <p class="defi-desc">${g ? `Temps à battre : <b>${mmss(g.t)}</b> (${esc(g.n)})` : 'Personne n’a encore de temps : lance-toi !'}</p>
+      ${rows.length > 1 ? `<ol class="c-splits duel-rank">${rows.map((m) => `<li${m.me ? ' class="is-me"' : ''}><span>${esc(m.n)}${m.me ? ' (toi)' : ''}</span><b>${m.t ? mmss(m.t) : '–'}</b></li>`).join('')}</ol>` : ''}
+      <div class="actions"><button type="button" class="btn btn--cat" data-duel-go="${x.id}">${icon('play')}Faire le parcours</button></div></div></article>`;
+  }
+  function boardCard() {
+    if (!CLOUD.linked || !ui.board || ui.board.length < 2) return '';
+    const rows = ui.board.map((r) => ({ ...r, pts: r.week === weekId ? r.pts : 0 })).sort((a, b) => b.pts - a.pts);
+    return `<article class="card board"><header class="card-head"><span class="chip-ico">${icon('trophy')}</span><div><h2 class="h2">Classement de la semaine</h2><p class="muted">Points gagnés depuis lundi</p></div></header>
+      <ol class="board-list">${rows.map((r, i) => `<li${r.me ? ' class="is-me"' : ''}><span class="board-rank">${i + 1}</span><span>${esc(r.pseudo)}${r.me ? ' (toi)' : ''}</span><b>${r.pts} pts</b></li>`).join('')}</ol></article>`;
+  }
+  function openDuel(type, duree, time) {
+    const pals = CLOUD.linked ? (ui.friends || []).filter((f) => f.status === 'accepted') : [];
+    const T = window.NA_CIRCUITS.TYPES[type] || {};
+    const dlg = document.createElement('dialog'); dlg.id = 'duel'; dlg.className = 'dlg dlg--sheet'; dlg.setAttribute('aria-labelledby', 'duel-title');
+    dlg.innerHTML = `<form method="dialog" id="duel-form" class="dlg-body" data-type="${type}" data-duree="${duree}" data-time="${time}">
+      <header class="dlg-head"><h2 class="h2" id="duel-title">Défier un ami</h2><button type="button" class="round" data-act="duel-close" aria-label="Fermer">${icon('x')}</button></header>
+      <p>Parcours ${esc((T.name || type).toLowerCase())} · ${duree} min, pour le temps. Ton temps à battre : <b>${mmss(time)}</b>.</p>
+      ${pals.length ? `<fieldset><legend>Qui défier ?</legend><div class="choices">${pals.map((f) => `<label class="choice"><input type="checkbox" name="friend" value="${f.friend_id}" data-pseudo="${esc(f.pseudo)}"><span>${esc(f.pseudo)}</span></label>`).join('')}</div></fieldset>
+        <label class="field"><span>Un mot (facultatif)</span><input name="msg" maxlength="120" placeholder="Prêt à prendre une claque ?"></label>
+        <p class="hint" id="duel-error" role="alert"></p>
+        <div class="dlg-actions"><button type="submit" class="btn btn--big btn--sheen">${icon('send')}Envoyer le défi</button></div>`
+        : '<p class="hint">Ajoute d’abord un ami dans Défis › Amis, avec son pseudo Kin Fit.</p>'}
+    </form>`;
+    document.body.appendChild(dlg); dlg.addEventListener('close', () => dlg.remove()); dlg.showModal();
   }
 
   function viewAlbum(sess) {
@@ -1083,7 +1125,7 @@
         ${c.missing ? '<p class="note">Il te faut une paire d’haltères. Pour débuter, des bouteilles d’eau ou un sac chargé font l’affaire.</p>' : ''}
         ${c.knee ? '<p class="note">Genou signalé : les sauts sont remplacés par des versions sans impact.</p>' : ''}
         <dl class="facts">${c.facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
-        ${c.mode === 'temps' ? `<p class="c-rec">${icon('trophy')}<span>${rec ? `Ton record : <b>${mmss(rec.t)}</b>` : 'Pas encore de record : lance ton premier chrono !'}</span></p>` : ''}
+        ${c.mode === 'temps' ? `<p class="c-rec">${icon('trophy')}<span>${rec ? `Ton record : <b>${mmss(rec.t)}</b>` : 'Pas encore de record : lance ton premier chrono !'}</span>${rec && CLOUD.linked ? `<button type="button" class="link-btn" data-act="duel-new" data-type="${c.type}" data-duree="${c.duree}" data-time="${rec.t}">Défier un ami</button>` : ''}</p>` : ''}
         <p>${esc(c.why)}</p>
         <div class="actions c-start"><button type="button" class="btn btn--big btn--sheen" data-act="circuit-start">${icon('play')}Commencer le parcours</button></div>
         <section class="parcours-part"><h3 class="h3">Échauffement · ${c.warm} min</h3>${list(c.warmList)}</section>
@@ -1359,8 +1401,8 @@
   async function refreshSocial() {
     if (!CLOUD.linked) { ui.friends = null; return; }
     try {
-      const [fr, ch] = await Promise.all([CLOUD.friends(), CLOUD.challenges()]);
-      ui.friends = fr || [];
+      const [fr, ch, bd] = await Promise.all([CLOUD.friends(), CLOUD.challenges(), CLOUD.board ? CLOUD.board().catch(() => null) : null]);
+      ui.friends = fr || []; ui.board = bd;
       const sess = state.sessions.find((x) => x.uid === CLOUD.user.id);
       if (sess) {
         const me = CLOUD.profile.pseudo; const prev = new Map(sess.inbox.filter((x) => x.cloud).map((x) => [x.id, x]));
@@ -1923,7 +1965,7 @@
     if (g.phase === 'done') {
       endHr(g); const h = g.hrSum;
       const kcal = h ? h.kcal : g.kind === 'muscu' ? sessionMeta(g.item, p, sess.seed).kcal : g.item.kcal;
-      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">${g.kind === 'circuit' ? 'Parcours terminé !' : 'Séance terminée !'}</h2>${g.kind === 'circuit' && g.c.mode === 'temps' ? `<div class="c-total"><b>${mmss(g.final || g.clock)}</b><span>temps total</span></div>${g.newRecord ? `<p class="c-newrec">${icon('trophy')}${g.prevRec ? `Nouveau record ! ${mmss(g.prevRec.t - g.final)} de mieux` : 'Premier record enregistré !'}</p>` : g.prevRec ? `<p class="hint">Ton record : ${mmss(g.prevRec.t)}</p>` : ''}` : ''}<p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : g.kind === 'circuit' ? `${Math.max(1, Math.round(g.spent / 60))} min · ` : ''}≈ ${kcal} kcal dépensées</p>${g.kind === 'circuit' && g.splits && g.splits.length ? `<ol class="c-splits">${[...g.splits].sort((a, b) => a.k - b.k).map((y) => `<li><span>${esc(y.n)}</span><b>${mmss(y.t)}</b></li>`).join('')}</ol>` : ''}${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><div class="actions g-actions"><button type="button" class="btn btn--big btn--ghost" data-act="g-share">${icon('share')}Partager</button><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div></div>`;
+      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">${g.kind === 'circuit' ? 'Parcours terminé !' : 'Séance terminée !'}</h2>${g.kind === 'circuit' && g.c.mode === 'temps' ? `<div class="c-total"><b>${mmss(g.final || g.clock)}</b><span>temps total</span></div>${g.newRecord ? `<p class="c-newrec">${icon('trophy')}${g.prevRec ? `Nouveau record ! ${mmss(g.prevRec.t - g.final)} de mieux` : 'Premier record enregistré !'}</p>` : g.prevRec ? `<p class="hint">Ton record : ${mmss(g.prevRec.t)}</p>` : ''}` : ''}<p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : g.kind === 'circuit' ? `${Math.max(1, Math.round(g.spent / 60))} min · ` : ''}≈ ${kcal} kcal dépensées</p>${g.kind === 'circuit' && g.ghost && g.final ? `<p class="${g.duelWon ? 'c-newrec' : 'hint'}">${g.duelWon ? `${icon('trophy')}Tu bats ${esc(g.ghost.n)} de ${mmss(g.ghost.t - g.final)} !` : `Encore ${mmss(g.final - g.ghost.t)} pour battre ${esc(g.ghost.n)}.`}</p>` : ''}${g.kind === 'circuit' && g.c.mode === 'temps' && CLOUD.linked && (g.final || g.clock) ? `<button type="button" class="link-btn" data-act="duel-new" data-type="${g.c.type}" data-duree="${g.c.duree}" data-time="${g.final || g.clock}">${icon('send')}Défier un ami sur ce parcours</button>` : ''}${g.kind === 'circuit' && g.splits && g.splits.length ? `<ol class="c-splits">${[...g.splits].sort((a, b) => a.k - b.k).map((y) => `<li><span>${esc(y.n)}</span><b>${mmss(y.t)}</b></li>`).join('')}</ol>` : ''}${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><div class="actions g-actions"><button type="button" class="btn btn--big btn--ghost" data-act="g-share">${icon('share')}Partager</button><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div></div>`;
     } else if (g.kind === 'circuit') {
       body = circuitBody(g, p, head);
     } else if (g.kind === 'cardio') {
@@ -2099,7 +2141,8 @@
     const sess = cur(); if (!sess) return;
     const sv = dayView(sess, todayIdx); const p = sess.profile;
     const c = window.NA_CIRCUITS.build(p, ui.circuit, ui.circuitDur || durOf(p), cmodeOf(ui.circuit)); const segs = c.mode === 'temps' ? tempsSegs(c) : circuitSegs(c);
-    ui.guide = { kind: 'circuit', c, sv, segs, k: 0, left: segs[0].sec, total: segs.reduce((t, s) => t + s.sec, 0), spent: 0, clock: 0, split: 0, splits: [], cued: {}, phase: 'circuit', paused: true, started: false, sound: true,
+    const duel = c.mode === 'temps' ? sess.inbox.find((x) => isDuel(x) && x.status === 'accepted' && x.cid === `duel:${c.type}:${c.duree}` && (!ui.duel || x.id === ui.duel)) : null; ui.duel = null;
+    ui.guide = { kind: 'circuit', duel: duel ? duel.id : null, ghost: duel ? duelGhost(duel) : null, c, sv, segs, k: 0, left: segs[0].sec, total: segs.reduce((t, s) => t + s.sec, 0), spent: 0, clock: 0, split: 0, splits: [], cued: {}, phase: 'circuit', paused: true, started: false, sound: true,
       item: { title: `Parcours ${c.name.toLowerCase()}`, kcal: c.kcal } };
     const old = $('#guide'); if (old) old.remove();
     const dlg = document.createElement('dialog'); dlg.id = 'guide'; dlg.className = 'dlg dlg--full guide guide--circuit'; dlg.setAttribute('aria-label', 'Parcours guidé');
@@ -2147,6 +2190,7 @@
       <p class="c-target">${esc(goal)}</p>${load && !s.x.run ? `<p class="g-load">${esc(load)}</p>` : ''}
       ${d && d.photos ? window.NA_EXO.anim(d, true) : ''}
       <div class="c-clock"><b id="c-clock">${mmss(g.clock)}</b><span>temps total · cet exercice <b id="c-split">${mmss(g.split)}</b></span></div>
+      ${g.ghost ? `<p class="c-ghost">${icon('user')}Temps à battre : <b>${mmss(g.ghost.t)}</b> (${esc(g.ghost.n)})</p>` : ''}
       ${main}
       ${nx ? `<p class="g-next"><span>Ensuite :</span> <b>${esc(nx.x.n)}</b> · <span>${esc(nx.x.meta.split(' · ')[0])}</span></p>` : '<p class="g-next"><b>Dernier exercice, à fond !</b></p>'}
       <div class="actions g-actions c-ctl"><button type="button" class="round" data-act="c-prev" aria-label="Étape précédente">${icon('prev')}</button>${g.started ? `<button type="button" class="round" data-act="c-toggle" aria-label="${g.paused ? 'Reprendre' : 'Pause'}">${icon(g.paused ? 'play' : 'pause')}</button>` : ''}<button type="button" class="round" data-act="c-next" aria-label="Étape suivante">${icon('next')}</button><button type="button" class="round" data-act="c-sound" aria-pressed="${g.sound}" aria-label="Sons et voix">${icon('sound')}</button>${s.x.id ? `<button type="button" class="round" data-video="${s.x.id}" aria-label="Voir la vidéo">${icon('play')}</button>` : ''}</div>
@@ -2191,6 +2235,12 @@
       sess.records = sess.records || {}; g.prevRec = sess.records[key] || null;
       // A record only counts when every exercise was validated.
       if (g.splits.length >= tasks && g.final > 0 && (!g.prevRec || g.final < g.prevRec.t)) { g.newRecord = true; if (g.prevRec) sess.recBeats = (sess.recBeats || 0) + 1; sess.records[key] = { t: g.final, at: new Date().toISOString(), splits: g.splits }; }
+    }
+    const dx = g.duel ? sess.inbox.find((x) => x.id === g.duel) : null;
+    if (dx && c.mode === 'temps' && g.splits.length >= g.segs.filter((y) => y.t === 'task').length) {
+      const best = dx.progress ? Math.min(dx.progress, g.final) : g.final; dx.progress = best; if (dx.cloud) CLOUD.setProgress(dx.id, best).catch(() => {});
+      g.duelWon = !!(g.ghost && g.final < g.ghost.t);
+      if ((g.duelWon || !g.ghost) && !sess.done[`x:${dx.id}`]) { sess.done[`x:${dx.id}`] = iso(TODAY); sess.points += 50; }
     }
     L0.circuits = (L0.circuits || []).concat({ type: c.type, mode: c.mode, duree: c.duree, min, kcal: g.item.kcal, time: c.mode === 'temps' ? g.final : null, at: new Date().toISOString() }); save();
     g.phase = 'done'; renderGuide(); celebrateGuide(); if (g.newRecord) sparks(innerWidth / 2, innerHeight / 2, 160, 1.1); beep(1318, 600);
@@ -2501,6 +2551,10 @@
       if (x) { x.progress = Math.max(0, (x.progress || 0) + +v); if (x.cloud) CLOUD.setProgress(x.id, x.progress).catch(() => {}); settle(sess); render(); refocus(`[data-sstep="${t.dataset.sstep}"]`); }
       return;
     }
+    if (t.dataset.duelGo && sess) {
+      const x = sess.inbox.find((y) => y.id === t.dataset.duelGo); if (!x) return;
+      const d = duelOf(x); ui.circuit = d.type; ui.circuitDur = d.duree; ui.cmode = 'temps'; ui.duel = x.id; ui.sportTab = 'parcours'; go('sport'); openCircuit(); return;
+    }
     if (t.dataset.accept && sess) { const x = sess.inbox.find((y) => y.id === t.dataset.accept); if (x) { x.status = 'accepted'; if (x.cloud) CLOUD.respond(x.id, 'accepted').catch(() => {}); save(); render(); toast('Défi relevé. À toi de jouer !'); } return; }
     if (t.dataset.decline && sess) { const x = sess.inbox.find((y) => y.id === t.dataset.decline); if (x) { x.status = 'declined'; if (x.cloud) CLOUD.respond(x.id, 'declined').catch(() => {}); save(); render(); } return; }
     if (t.dataset.copy && sess) { const x = sess.inbox.find((y) => y.id === t.dataset.copy); if (x) { const r = await shareItem(x, sess); if (r) toast(r === 'copié' ? 'Lien copié. Envoie-le à qui tu veux.' : 'Défi partagé.'); } return; }
@@ -2661,6 +2715,8 @@
     if (a === 'g-toggle' && ui.guide) { ui.guide.paused = !ui.guide.paused; if (!ui.guide.paused) startTimer(); renderGuide(); return; }
     if (a === 'g-cardio-done' && ui.guide) { finishCardio(); return; }
     if (a === 'g-share' && ui.guide) { shareCard(); return; }
+    if (a === 'duel-new') { openDuel(t.dataset.type, +t.dataset.duree, +t.dataset.time); return; }
+    if (a === 'duel-close') { const d = $('#duel'); if (d) d.close(); return; }
     if (a === 'hyrox-open') { openHyrox(); return; }
     if (a === 'hyrox-close') { const d = $('#hyrox'); if (d) d.close(); return; }
     if (a === 'hyrox-stop' && sess) { if (!window.confirm('Arrêter la préparation Hyrox ? Tes temps et records restent enregistrés.')) return; delete sess.hyrox; save(); render(); toast('Préparation Hyrox arrêtée.'); return; }
@@ -2760,6 +2816,23 @@
       const was = omadOn(sess);
       sess.profile.omad = { on: true, at: fd.get('at') || '19:00', since: (sess.profile.omad && sess.profile.omad.since && was) ? sess.profile.omad.since : iso(TODAY) };
       save(); $('#omad').close(); render(); toast(was ? 'Heure du repas enregistrée.' : 'Mode OMAD activé. Ton repas unique remplace tes trois repas.');
+      return;
+    }
+    if (e.target.id === 'duel-form') {
+      e.preventDefault(); const sess = cur(); if (!sess) return; const f = e.target; const fd = new FormData(f);
+      const fids = fd.getAll('friend'); if (!fids.length) { $('#duel-error').textContent = 'Coche au moins un ami.'; return; }
+      const type = f.dataset.type; const duree = +f.dataset.duree; const time = +f.dataset.time; const T = window.NA_CIRCUITS.TYPES[type] || {};
+      const c = { cid: `duel:${type}:${duree}`, title: `Défi chrono · Parcours ${(T.name || type).toLowerCase()} ${duree} min`, unit: 's', target: time, cat: 'sport', icon: 'clock', steps: [1] };
+      const msg = String(fd.get('msg') || '').trim().slice(0, 120); const pseudos = [...f.querySelectorAll('input[name="friend"]:checked')].map((i) => i.dataset.pseudo);
+      const btn = f.querySelector('[type="submit"]'); btn.disabled = true;
+      (async () => {
+        try {
+          const id = await CLOUD.createChallenge(c, msg, fids); await CLOUD.setProgress(id, time).catch(() => {});
+          addToInbox(sess, { id, cloud: true, ...c, msg, progress: time, from: CLOUD.profile.pseudo, self: true, status: 'accepted', members: [], at: iso(TODAY) });
+          sess.sent.unshift({ id, title: c.title, to: pseudos.join(', '), at: iso(TODAY) }); save(); $('#duel').close(); render();
+          toast(`Défi envoyé à ${pseudos.join(', ')}.`); refreshSocial();
+        } catch (err) { btn.disabled = false; $('#duel-error').textContent = 'Le défi n’a pas pu partir. Vérifie ta connexion et réessaie.'; }
+      })();
       return;
     }
     if (e.target.id === 'hyrox-form') {
