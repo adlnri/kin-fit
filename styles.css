@@ -1090,4 +1090,14 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 .forme-f { display: grid; gap: 6px; }
 .forme-f li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--line); font-size: .95rem; }
 .forme-f b.up { color: var(--gold); } .forme-f b.down { color: var(--pink); }
+/* Hyrox preparation */
+.hx { border-color: color-mix(in srgb, var(--eau) 40%, var(--line)); }
+.hx .chip-ico { color: var(--eau); }
+.hx-bar i { background: linear-gradient(90deg, var(--eau), var(--gold)); }
+.hx-curve { display: grid; gap: 6px; }
+.hx-curve svg { width: 100%; height: auto; }
+.hx-curve polyline { fill: none; stroke: var(--gold); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(198, 255, 0, .5)); }
+.hx-curve circle { fill: var(--pink); }
+.hx-curve figcaption { color: var(--text-2); font-size: .9rem; }
+.field { display: grid; gap: 6px; } .field input { min-height: 48px; padding: 0 14px; border-radius: var(--r); border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text); color-scheme: dark; }
 

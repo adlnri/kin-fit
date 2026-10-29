@@ -23,7 +23,7 @@
     flame: 'M12 21c-3.9 0-7-2.7-7-6.5 0-3.5 3-5.5 4-9 2 1.5 3 3.5 3 5.5 1-1 1.5-2 1.5-3.5 2.5 2 5.5 4.5 5.5 7 0 3.8-3.1 6.5-7 6.5z',
     trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6',
     send: 'M21 3L10 14M21 3l-7 18-4-7-7-4z',
-    share: 'M4 13v7h16v-7M12 3v12M7 8l5-5 5 5',
+    share: 'M4 13v7h16v-7M12 3v12M7 8l5-5 5 5', flag: 'M5 21V4M5 4h12l-2.5 4 2.5 4H5',
     link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7L12 6.3M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
     check: 'M5 12.5l4.5 4.5L19 7',
     plus: 'M12 5v14M5 12h14',
@@ -1052,6 +1052,7 @@
         ${C.TYPES[c.type].chrono ? '' : `<div class="seg seg--mode" role="group" aria-label="Format du parcours"><button type="button" data-cmode="chrono" aria-pressed="${c.mode === 'chrono'}">${icon('clock')}Au chrono</button><button type="button" data-cmode="temps" aria-pressed="${c.mode === 'temps'}">${icon('bolt')}Pour le temps</button></div>`}
       </div>
       <p class="hint c-mode-hint">${c.mode === 'temps' ? 'Pour le temps : un objectif par exercice, à faire le plus vite possible. Tu valides chaque exercice et ton temps total devient ton record à battre.' : 'Au chrono : chaque exercice dure un temps fixe, l’app enchaîne toute seule avec bips et voix.'}</p>
+      ${c.type === 'hyrox' ? hyroxCard(sess) : ''}
       <article class="card card--sport parcours">
         <header class="card-head"><span class="chip-ico">${icon(c.icon)}</span><div><h2 class="h2">Parcours ${c.name.toLowerCase()}</h2><p class="muted">${c.sub}</p></div></header>
         ${c.missing ? '<p class="note">Il te faut une paire d’haltères. Pour débuter, des bouteilles d’eau ou un sac chargé font l’affaire.</p>' : ''}
@@ -1075,6 +1076,68 @@
         <p class="hint">Bois quelques gorgées entre les tours. Si une position fait mal, passe à l’exercice suivant.</p>
         <div class="actions c-start"><button type="button" class="btn btn--big btn--sheen" data-act="circuit-start">${icon('play')}Commencer le parcours</button></div>
       </article>${foot()}`;
+  }
+
+  /* ---------- Hyrox preparation (only when the member asks for it) ---------- */
+
+  const HX_PHASES = [
+    { n: 'Fondations', until: 0.35, plan: ['1 parcours Hyrox pour le temps de 45 min', '1 footing de 30 à 40 min en endurance facile', 'Technique : wall balls et burpees sautés, 3 × 10 sans chrono'] },
+    { n: 'Développement', until: 0.7, plan: ['1 parcours Hyrox pour le temps de 60 min', '1 fractionné : 6 × 1 km à allure course, 90 s de récupération', '1 séance de force : fentes, tractions, poussées'] },
+    { n: 'Intensité', until: 1, plan: ['1 parcours Hyrox pour le temps de 75 à 90 min', '1 fractionné : 4 × 2 km à allure course', 'Course après chaque station : 1 km juste après la station, pour habituer les jambes'] },
+  ];
+  const HX_TAPER = { n: 'Affûtage', plan: ['1 parcours Hyrox court de 30 min à allure course', '2 footings faciles de 20 min', 'Repos les 2 jours avant la course : sommeil, eau et glucides'] };
+  const HX_GOALS = { finir: 'Finir la course', '90': 'Moins de 1 h 30', '75': 'Moins de 1 h 15', '60': 'Moins de 1 h' };
+  function hyroxPlan(sess) {
+    const h = sess.hyrox; if (!h) return null;
+    const start = new Date(h.start); const day = 864e5;
+    const total = h.date ? Math.max(4, Math.min(16, Math.ceil((new Date(h.date) - start) / (7 * day)))) : 8;
+    const week = Math.max(1, Math.min(total, Math.floor((TODAY - start) / (7 * day)) + 1));
+    const frac = week / total; const phase = week === total ? HX_TAPER : HX_PHASES.find((x) => frac <= x.until) || HX_PHASES[2];
+    const test = week === 1 || (week % 4 === 0 && week !== total);
+    const left = h.date ? Math.ceil((new Date(h.date) - TODAY) / day) : null;
+    const monday = new Date(TODAY); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const done = Array.from({ length: 7 }, (_, k) => { const x = new Date(monday); x.setDate(x.getDate() + k); return (sess.log[iso(x)] || {}).circuits || []; }).flat().filter((x) => x.type === 'hyrox').length;
+    const pace = h.goal && h.goal !== 'finir' ? (+h.goal * 0.5) / 8 : null; // about half the race is running, over 8 km
+    return { total, week, phase, test, left, done, pace };
+  }
+  function hyroxResults(sess) {
+    return Object.keys(sess.log).sort().flatMap((d) => ((sess.log[d] || {}).circuits || []).filter((x) => x.type === 'hyrox' && x.mode === 'temps' && x.time && x.duree === 60).map((x) => ({ d, t: x.time })));
+  }
+  function hyroxCurve(res) {
+    if (res.length < 2) return '<p class="hint">Ta courbe de progression apparaîtra après deux tests Hyrox de 60 min « pour le temps ».</p>';
+    const W = 300; const H = 90; const ts = res.map((r) => r.t); const lo = Math.min(...ts); const hi = Math.max(...ts); const span = Math.max(1, hi - lo);
+    const pts = res.map((r, i) => [Math.round((i / (res.length - 1)) * (W - 20)) + 10, Math.round(10 + ((r.t - lo) / span) * (H - 20))]);
+    return `<figure class="hx-curve"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Progression de tes temps Hyrox"><polyline points="${pts.map((p) => p.join(',')).join(' ')}"/>${pts.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i === pts.length - 1 ? 5 : 3.5}"/>`).join('')}</svg>
+      <figcaption>Premier test ${mmss(res[0].t)} · dernier ${mmss(res[res.length - 1].t)} · meilleur ${mmss(lo)}</figcaption></figure>`;
+  }
+  function hyroxCard(sess) {
+    const pl = hyroxPlan(sess);
+    if (!pl) {
+      return `<article class="card hx hx--off"><header class="card-head"><span class="chip-ico">${icon('flag')}</span><div><h2 class="h2">Préparation Hyrox</h2><p class="muted">Facultatif</p></div></header>
+        <p>Tu as une course Hyrox en vue ? Active une préparation de 4 à 16 semaines : un plan chaque semaine, un test chronométré tous les mois et ta courbe de progression. Ton programme habituel ne change pas.</p>
+        <div class="actions"><button type="button" class="btn btn--ghost" data-act="hyrox-open">${icon('flag')}Préparer une course Hyrox</button></div></article>`;
+    }
+    const h = sess.hyrox; const res = hyroxResults(sess);
+    return `<article class="card hx"><header class="card-head"><span class="chip-ico">${icon('flag')}</span><div><h2 class="h2">Préparation Hyrox</h2><p class="muted">Semaine ${pl.week}/${pl.total} · ${pl.phase.n}${pl.left != null ? ` · J-${Math.max(0, pl.left)}` : ''}</p></div></header>
+      <div class="forme-bar hx-bar" role="img" aria-label="Semaine ${pl.week} sur ${pl.total}"><i style="width:${(pl.week / pl.total) * 100}%"></i></div>
+      ${pl.test ? '<p class="note"><b>Semaine test.</b> Fais le parcours Hyrox de 60 min « pour le temps » et compare avec ton dernier test.</p>' : ''}
+      <p class="label">Cette semaine</p><ul class="forme-f">${pl.phase.plan.map((x) => `<li><span>${esc(x)}</span></li>`).join('')}</ul>
+      <p class="hint">${pl.done ? `${pl.done} parcours Hyrox fait${pl.done > 1 ? 's' : ''} cette semaine.` : 'Pas encore de parcours Hyrox cette semaine.'}${h.goal ? ` Objectif : ${HX_GOALS[h.goal]}.` : ''}${pl.pace ? ` Allure cible en course : environ ${String(pl.pace.toFixed(1)).replace('.', ',')} min par km.` : ''}</p>
+      ${hyroxCurve(res)}
+      <div class="actions"><button type="button" class="btn btn--ghost" data-act="hyrox-open">Modifier</button><button type="button" class="link-btn" data-act="hyrox-stop">Arrêter la préparation</button></div></article>`;
+  }
+  function openHyrox() {
+    const sess = cur(); if (!sess) return; const h = sess.hyrox || {};
+    const min = new Date(TODAY); min.setDate(min.getDate() + 21);
+    const dlg = document.createElement('dialog'); dlg.id = 'hyrox'; dlg.className = 'dlg dlg--sheet'; dlg.setAttribute('aria-labelledby', 'hyrox-title');
+    dlg.innerHTML = `<form method="dialog" id="hyrox-form" class="dlg-body">
+      <header class="dlg-head"><h2 class="h2" id="hyrox-title">Préparer une course Hyrox</h2><button type="button" class="round" data-act="hyrox-close" aria-label="Fermer">${icon('x')}</button></header>
+      <label class="field"><span>Date de la course (facultatif)</span><input type="date" name="date" min="${iso(min)}" value="${h.date || ''}"></label>
+      <p class="hint">Sans date, la préparation dure 8 semaines.</p>
+      <fieldset><legend>Ton objectif</legend><div class="choices">${Object.entries(HX_GOALS).map(([k, l]) => radio('goal', k, l, h.goal || 'finir')).join('')}</div></fieldset>
+      <div class="dlg-actions"><button type="submit" class="btn btn--big btn--sheen">${sess.hyrox ? 'Enregistrer' : 'Lancer la préparation'}</button></div>
+    </form>`;
+    document.body.appendChild(dlg); dlg.addEventListener('close', () => dlg.remove()); dlg.showModal();
   }
 
   /* ---------- Sport and Nutrition spaces ---------- */
@@ -2071,7 +2134,7 @@
       // A record only counts when every exercise was validated.
       if (g.splits.length >= tasks && g.final > 0 && (!g.prevRec || g.final < g.prevRec.t)) { g.newRecord = true; sess.records[key] = { t: g.final, at: new Date().toISOString(), splits: g.splits }; }
     }
-    L0.circuits = (L0.circuits || []).concat({ type: c.type, mode: c.mode, min, kcal: g.item.kcal, time: c.mode === 'temps' ? g.final : null, at: new Date().toISOString() }); save();
+    L0.circuits = (L0.circuits || []).concat({ type: c.type, mode: c.mode, duree: c.duree, min, kcal: g.item.kcal, time: c.mode === 'temps' ? g.final : null, at: new Date().toISOString() }); save();
     g.phase = 'done'; renderGuide(); celebrateGuide(); if (g.newRecord) sparks(innerWidth / 2, innerHeight / 2, 160, 1.1); beep(1318, 600);
   }
 
@@ -2540,6 +2603,9 @@
     if (a === 'g-toggle' && ui.guide) { ui.guide.paused = !ui.guide.paused; if (!ui.guide.paused) startTimer(); renderGuide(); return; }
     if (a === 'g-cardio-done' && ui.guide) { finishCardio(); return; }
     if (a === 'g-share' && ui.guide) { shareCard(); return; }
+    if (a === 'hyrox-open') { openHyrox(); return; }
+    if (a === 'hyrox-close') { const d = $('#hyrox'); if (d) d.close(); return; }
+    if (a === 'hyrox-stop' && sess) { if (!window.confirm('Arrêter la préparation Hyrox ? Tes temps et records restent enregistrés.')) return; delete sess.hyrox; save(); render(); toast('Préparation Hyrox arrêtée.'); return; }
     if ((a === 'forme-light' || a === 'forme-push') && sess) {
       const c = todayCheck(sess); sess.today = { date: iso(TODAY), min: c ? c.min : durOf(sess.profile), forme: a === 'forme-light' ? 'fatigue' : 'forme' };
       save(); render(); toast(a === 'forme-light' ? 'Séance allégée pour aujourd’hui.' : 'Séance un cran plus intense aujourd’hui.'); return;
@@ -2633,6 +2699,13 @@
       const was = omadOn(sess);
       sess.profile.omad = { on: true, at: fd.get('at') || '19:00', since: (sess.profile.omad && sess.profile.omad.since && was) ? sess.profile.omad.since : iso(TODAY) };
       save(); $('#omad').close(); render(); toast(was ? 'Heure du repas enregistrée.' : 'Mode OMAD activé. Ton repas unique remplace tes trois repas.');
+      return;
+    }
+    if (e.target.id === 'hyrox-form') {
+      e.preventDefault(); const sess = cur(); if (!sess) return;
+      const fd = new FormData(e.target); const was = !!sess.hyrox;
+      sess.hyrox = { start: was ? sess.hyrox.start : iso(TODAY), date: fd.get('date') || '', goal: fd.get('goal') || 'finir' };
+      save(); $('#hyrox').close(); render(); toast(was ? 'Préparation mise à jour.' : 'Préparation Hyrox lancée. Première semaine : fais ton test de départ.');
       return;
     }
     if (e.target.id === 'checkin-form') {
