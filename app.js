@@ -1040,19 +1040,23 @@
 
   function viewParcours(sess, tabs) {
     const p = sess.profile; const C = window.NA_CIRCUITS;
-    const c = C.build(p, ui.circuit, ui.circuitDur || durOf(p));
+    const c = C.build(p, ui.circuit, ui.circuitDur || durOf(p), cmodeOf(ui.circuit));
     const list = (xs) => `<ul class="ai-list">${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    const rec = (sess.records || {})[recKey(c)];
     return `<header class="hello"><div><h1 class="h1">Parcours</h1><p class="lede">Des circuits à enchaîner sans temps mort : choisis ton style et ta durée, le rythme et le nombre de tours suivent ton niveau.</p></div>
       <div class="actions"><button type="button" class="btn btn--ghost" data-act="print">Imprimer</button></div></header>${tabs}
       <div class="parcours-pick">
         <div class="seg" role="group" aria-label="Type de parcours">${Object.entries(C.TYPES).map(([k, t]) => `<button type="button" data-circuit="${k}" aria-pressed="${k === c.type}">${icon(t.icon)}${t.name}</button>`).join('')}</div>
         <div class="seg" role="group" aria-label="Durée du parcours">${DUREES.map((n) => `<button type="button" data-cdur="${n}" aria-pressed="${n === c.duree}">${n} min</button>`).join('')}</div>
+        ${C.TYPES[c.type].chrono ? '' : `<div class="seg seg--mode" role="group" aria-label="Format du parcours"><button type="button" data-cmode="chrono" aria-pressed="${c.mode === 'chrono'}">${icon('clock')}Au chrono</button><button type="button" data-cmode="temps" aria-pressed="${c.mode === 'temps'}">${icon('bolt')}Pour le temps</button></div>`}
       </div>
+      <p class="hint c-mode-hint">${c.mode === 'temps' ? 'Pour le temps : un objectif par exercice, à faire le plus vite possible. Tu valides chaque exercice et ton temps total devient ton record à battre.' : 'Au chrono : chaque exercice dure un temps fixe, l’app enchaîne toute seule avec bips et voix.'}</p>
       <article class="card card--sport parcours">
         <header class="card-head"><span class="chip-ico">${icon(c.icon)}</span><div><h2 class="h2">Parcours ${c.name.toLowerCase()}</h2><p class="muted">${c.sub}</p></div></header>
         ${c.missing ? '<p class="note">Il te faut une paire d’haltères. Pour débuter, des bouteilles d’eau ou un sac chargé font l’affaire.</p>' : ''}
         ${c.knee ? '<p class="note">Genou signalé : les sauts sont remplacés par des versions sans impact.</p>' : ''}
         <dl class="facts">${c.facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+        ${c.mode === 'temps' ? `<p class="c-rec">${icon('trophy')}<span>${rec ? `Ton record : <b>${mmss(rec.t)}</b>` : 'Pas encore de record : lance ton premier chrono !'}</span></p>` : ''}
         <p>${esc(c.why)}</p>
         <div class="actions c-start"><button type="button" class="btn btn--big btn--sheen" data-act="circuit-start">${icon('play')}Commencer le parcours</button></div>
         <section class="parcours-part"><h3 class="h3">Échauffement · ${c.warm} min</h3>${list(c.warmList)}</section>
@@ -1786,7 +1790,7 @@
     if (g.phase === 'done') {
       endHr(g); const h = g.hrSum;
       const kcal = h ? h.kcal : g.kind === 'muscu' ? sessionMeta(g.item, p, sess.seed).kcal : g.item.kcal;
-      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">${g.kind === 'circuit' ? 'Parcours terminé !' : 'Séance terminée !'}</h2><p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : g.kind === 'circuit' ? `${Math.max(1, Math.round(g.spent / 60))} min · ` : ''}≈ ${kcal} kcal dépensées</p>${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div>`;
+      body = `${head(100, g.item.title)}<div class="g-main g-done">${icon('trophy', 'g-trophy')}<h2 class="g-name">${g.kind === 'circuit' ? 'Parcours terminé !' : 'Séance terminée !'}</h2>${g.kind === 'circuit' && g.c.mode === 'temps' ? `<div class="c-total"><b>${mmss(g.final || g.clock)}</b><span>temps total</span></div>${g.newRecord ? `<p class="c-newrec">${icon('trophy')}${g.prevRec ? `Nouveau record ! ${mmss(g.prevRec.t - g.final)} de mieux` : 'Premier record enregistré !'}</p>` : g.prevRec ? `<p class="hint">Ton record : ${mmss(g.prevRec.t)}</p>` : ''}` : ''}<p class="lede">${g.kind === 'muscu' ? `${g.steps.length} séries · ` : g.kind === 'circuit' ? `${Math.max(1, Math.round(g.spent / 60))} min · ` : ''}≈ ${kcal} kcal dépensées</p>${g.kind === 'circuit' && g.splits && g.splits.length ? `<ol class="c-splits">${[...g.splits].sort((a, b) => a.k - b.k).map((y) => `<li><span>${esc(y.n)}</span><b>${mmss(y.t)}</b></li>`).join('')}</ol>` : ''}${h ? `<p class="g-hr">${icon('heart')}<span>FC moyenne ${h.avg} · max ${h.max}</span></p>` : ''}<p class="hint">Bois un grand verre d’eau et prends des protéines dans les deux heures.</p><button type="button" class="btn btn--big btn--sheen" data-act="g-finish">Terminer</button></div>`;
     } else if (g.kind === 'circuit') {
       body = circuitBody(g, p, head);
     } else if (g.kind === 'cardio') {
@@ -1857,6 +1861,19 @@
     return out;
   }
 
+  // Hyrox defaults to "pour le temps", the other circuits to the timer; mobility stays timed.
+  const cmodeOf = (type) => (type === 'mobilite' ? 'chrono' : ui.cmode || (type === 'hyrox' || !type ? 'temps' : 'chrono'));
+  const recKey = (c) => `${c.type}:${c.duree}`;
+  function tempsSegs(c) {
+    const out = [{ t: 'warm', sec: c.warm * 60, list: c.warmList }];
+    let b = 0;
+    for (let r = 1; r <= c.rounds; r++) {
+      c.stations.forEach((x) => { if (x.run) b += 1; out.push({ t: 'task', sec: 0, x, r: c.rounds > 1 ? r : 0, b: c.type === 'hyrox' ? b : 0 }); });
+    }
+    out.push({ t: 'cool', sec: c.cool * 60, list: c.coolList });
+    return out;
+  }
+
   let actx = null;
   function beep(f, ms) {
     const g = ui.guide; if (!g || !g.sound) return;
@@ -1872,7 +1889,7 @@
     const s = g.segs[g.k]; const tr = (x) => (window.NA_I18N && window.NA_I18N.t ? window.NA_I18N.t(x) : x);
     const nx = s.x ? null : g.segs.slice(g.k + 1).find((y) => y.x);
     const sec = s.sec >= 120 ? `${Math.round(s.sec / 60)} minutes` : `${s.sec} secondes`;
-    const txt = s.x ? `${tr(s.x.n)}, ${sec}` : `${tr(SEG[s.t])}, ${sec}${nx && s.t !== 'warm' ? `. ${tr('Ensuite')} : ${tr(nx.x.n)}` : ''}`;
+    const txt = s.t === 'task' ? `${tr(s.x.n)}, ${tr(s.x.meta.split(' · ')[0])}` : s.x ? `${tr(s.x.n)}, ${sec}` : `${tr(SEG[s.t])}, ${sec}${nx && s.t !== 'warm' ? `. ${tr('Ensuite')} : ${tr(nx.x.n)}` : ''}`;
     const lang = ['en', 'es'].includes(window.NA_I18N.lang) ? window.NA_I18N.lang : 'fr';
     const u = new SpeechSynthesisUtterance(txt); u.lang = VOICE[lang]; u.rate = 1;
     window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
@@ -1881,8 +1898,8 @@
   function openCircuit() {
     const sess = cur(); if (!sess) return;
     const sv = dayView(sess, todayIdx); const p = sess.profile;
-    const c = window.NA_CIRCUITS.build(p, ui.circuit, ui.circuitDur || durOf(p)); const segs = circuitSegs(c);
-    ui.guide = { kind: 'circuit', c, sv, segs, k: 0, left: segs[0].sec, total: segs.reduce((t, s) => t + s.sec, 0), spent: 0, phase: 'circuit', paused: true, started: false, sound: true,
+    const c = window.NA_CIRCUITS.build(p, ui.circuit, ui.circuitDur || durOf(p), cmodeOf(ui.circuit)); const segs = c.mode === 'temps' ? tempsSegs(c) : circuitSegs(c);
+    ui.guide = { kind: 'circuit', c, sv, segs, k: 0, left: segs[0].sec, total: segs.reduce((t, s) => t + s.sec, 0), spent: 0, clock: 0, split: 0, splits: [], phase: 'circuit', paused: true, started: false, sound: true,
       item: { title: `Parcours ${c.name.toLowerCase()}`, kcal: c.kcal } };
     const old = $('#guide'); if (old) old.remove();
     const dlg = document.createElement('dialog'); dlg.id = 'guide'; dlg.className = 'dlg dlg--full guide guide--circuit'; dlg.setAttribute('aria-label', 'Parcours guidé');
@@ -1895,7 +1912,8 @@
   function circuitBody(g, p, head) {
     const s = g.segs[g.k]; const c = g.c;
     const before = g.segs.slice(0, g.k).reduce((t, y) => t + y.sec, 0);
-    const pct = ((before + s.sec - g.left) / g.total) * 100;
+    const pct = c.mode === 'temps' ? (g.k / g.segs.length) * 100 : ((before + s.sec - g.left) / g.total) * 100;
+    if (s.t === 'task') return taskBody(g, p, head, s, pct);
     const nx = g.segs.slice(g.k + 1).find((y) => y.x);
     const where = s.r ? `Tour ${s.r}/${c.rounds}` : s.b ? `Bloc ${s.b}/${c.stations.length / 2}` : '';
     const d = s.x && s.x.id && window.NA_EXO ? window.NA_EXO.detail(s.x.id, p, s.x.v) : null;
@@ -1914,21 +1932,50 @@
     </div>`;
   }
 
+  // One "pour le temps" exercise: the target, the running clock, this exercise's split and a big "Fait".
+  function taskBody(g, p, head, s, pct) {
+    const c = g.c; const nx = g.segs.slice(g.k + 1).find((y) => y.x);
+    const where = s.r ? `Tour ${s.r}/${c.rounds}` : s.b ? `Bloc ${s.b}/${c.stations.length / 2}` : '';
+    const d = s.x.id && window.NA_EXO ? window.NA_EXO.detail(s.x.id, p, s.x.v) : null;
+    const [goal, load] = s.x.meta.split(' · ');
+    const main = !g.started ? `<button type="button" class="btn btn--big btn--sheen c-done" data-act="c-toggle">${icon('play')}Démarrer le chrono</button>`
+      : g.paused ? `<button type="button" class="btn btn--big btn--sheen c-done" data-act="c-toggle">${icon('play')}Reprendre</button>`
+        : `<button type="button" class="btn btn--big btn--sheen c-done" data-act="c-done">${icon('check')}Fait</button>`;
+    return `${head(pct, g.item.title)}<div class="g-main c-phase c-phase--${s.x.run ? 'run' : 'work'} c-task">
+      <p class="label c-label">${where || 'Pour le temps'}</p>
+      <h2 class="g-name">${esc(s.x.n)}</h2>
+      <p class="c-target">${esc(goal)}</p>${load && !s.x.run ? `<p class="g-load">${esc(load)}</p>` : ''}
+      ${d && d.photos ? window.NA_EXO.anim(d, true) : ''}
+      <div class="c-clock"><b id="c-clock">${mmss(g.clock)}</b><span>temps total · cet exercice <b id="c-split">${mmss(g.split)}</b></span></div>
+      ${main}
+      ${nx ? `<p class="g-next"><span>Ensuite :</span> <b>${esc(nx.x.n)}</b> · <span>${esc(nx.x.meta.split(' · ')[0])}</span></p>` : '<p class="g-next"><b>Dernier exercice, à fond !</b></p>'}
+      <div class="actions g-actions c-ctl"><button type="button" class="round" data-act="c-prev" aria-label="Étape précédente">${icon('prev')}</button>${g.started ? `<button type="button" class="round" data-act="c-toggle" aria-label="${g.paused ? 'Reprendre' : 'Pause'}">${icon(g.paused ? 'play' : 'pause')}</button>` : ''}<button type="button" class="round" data-act="c-next" aria-label="Étape suivante">${icon('next')}</button><button type="button" class="round" data-act="c-sound" aria-pressed="${g.sound}" aria-label="Sons et voix">${icon('sound')}</button>${s.x.id ? `<button type="button" class="round" data-video="${s.x.id}" aria-label="Voir la vidéo">${icon('play')}</button>` : ''}</div>
+    </div>`;
+  }
+
   function circuitGo(k) {
     const g = ui.guide; if (!g) return;
     if (k >= g.segs.length) { finishCircuit(); return; }
-    g.k = Math.max(0, k); g.left = g.segs[g.k].sec;
+    const was = g.segs[g.k];
+    g.k = Math.max(0, k); g.left = g.segs[g.k].sec; g.split = 0;
+    if (was && was.t === 'task' && g.segs[g.k].t === 'cool') g.final = g.clock;
     if (!g.paused) announce();
     renderGuide();
   }
   function circuitTick(g) {
     if (g.paused) return;
+    const s = g.segs[g.k];
+    if (s.t === 'task') {
+      g.clock += 1; g.split += 1; g.spent += 1;
+      const a = $('#c-clock'); const b = $('#c-split'); if (a) a.textContent = mmss(g.clock); if (b) b.textContent = mmss(g.split);
+      return;
+    }
     g.left = Math.max(0, g.left - 1); g.spent += 1;
-    const s = g.segs[g.k]; const C = 2 * Math.PI * 70;
+    const C = 2 * Math.PI * 70;
     const left = $('#g-left'); const ring = $('#g-ring'); const bar = $('#guide .g-bar i');
     if (left) left.textContent = mmss(g.left);
     if (ring) ring.setAttribute('stroke-dashoffset', (C * (1 - g.left / s.sec)).toFixed(1));
-    if (bar) { const before = g.segs.slice(0, g.k).reduce((t, y) => t + y.sec, 0); bar.style.width = `${((before + s.sec - g.left) / g.total) * 100}%`; }
+    if (bar && g.c.mode !== 'temps') { const before = g.segs.slice(0, g.k).reduce((t, y) => t + y.sec, 0); bar.style.width = `${((before + s.sec - g.left) / g.total) * 100}%`; }
     if (g.left > 0 && g.left <= 3) beep(660, 140);
     if (g.left === 0) { beep(1046, 420); if (navigator.vibrate) navigator.vibrate([180, 80, 180]); circuitGo(g.k + 1); }
   }
@@ -1937,8 +1984,15 @@
     const c = g.c; const min = Math.max(1, Math.round(g.spent / 60));
     g.item.kcal = Math.round((c.kcal * g.spent) / (c.duree * 60) / 5) * 5;
     const sess = cur(); const L0 = lg(sess, iso(TODAY));
-    L0.circuits = (L0.circuits || []).concat({ type: c.type, min, kcal: g.item.kcal, at: new Date().toISOString() }); save();
-    g.phase = 'done'; renderGuide(); celebrateGuide(); beep(1318, 600);
+    if (c.mode === 'temps') {
+      g.final = g.final || g.clock;
+      const tasks = g.segs.filter((y) => y.t === 'task').length; const key = recKey(c);
+      sess.records = sess.records || {}; g.prevRec = sess.records[key] || null;
+      // A record only counts when every exercise was validated.
+      if (g.splits.length >= tasks && g.final > 0 && (!g.prevRec || g.final < g.prevRec.t)) { g.newRecord = true; sess.records[key] = { t: g.final, at: new Date().toISOString(), splits: g.splits }; }
+    }
+    L0.circuits = (L0.circuits || []).concat({ type: c.type, mode: c.mode, min, kcal: g.item.kcal, time: c.mode === 'temps' ? g.final : null, at: new Date().toISOString() }); save();
+    g.phase = 'done'; renderGuide(); celebrateGuide(); if (g.newRecord) sparks(innerWidth / 2, innerHeight / 2, 160, 1.1); beep(1318, 600);
   }
 
   function finishCardio() { const sess = cur(); const L0 = lg(sess, iso(TODAY)); L0.status = 'faite'; save(); ui.guide.phase = 'done'; clearInterval(guideTimer); renderGuide(); celebrateGuide(); }
@@ -2201,6 +2255,7 @@
     if (t.dataset.tab) { ui.defisTab = t.dataset.tab; render(); return refocus(`[data-tab="${ui.defisTab}"]`); }
     if (t.dataset.circuit) { ui.circuit = t.dataset.circuit; render(); return refocus(`[data-circuit="${ui.circuit}"]`); }
     if (t.dataset.cdur) { ui.circuitDur = +t.dataset.cdur; render(); return refocus(`[data-cdur="${ui.circuitDur}"]`); }
+    if (t.dataset.cmode) { ui.cmode = t.dataset.cmode; render(); return refocus(`[data-cmode="${ui.cmode}"]`); }
     if (t.dataset.dur && sess) { sess.profile.duree = +t.dataset.dur; save(); render(); return refocus(`[data-dur="${t.dataset.dur}"]`); }
     if (t.dataset.stab) { ui.sportTab = t.dataset.stab; render(); return refocus(`[data-stab="${ui.sportTab}"]`); }
     if (t.dataset.ntab) { ui.nutTab = t.dataset.ntab; render(); return refocus(`[data-ntab="${ui.nutTab}"]`); }
@@ -2411,6 +2466,11 @@
       renderGuide(); return;
     }
     if (a === 'c-next' && ui.guide) { circuitGo(ui.guide.k + 1); return; }
+    if (a === 'c-done' && ui.guide) {
+      const g = ui.guide; const s = g.segs[g.k];
+      g.splits = g.splits.filter((y) => y.k !== g.k).concat({ k: g.k, n: s.x.n, t: g.split });
+      beep(1046, 220); if (navigator.vibrate) navigator.vibrate(120); circuitGo(g.k + 1); return;
+    }
     if (a === 'c-prev' && ui.guide) { const g = ui.guide; circuitGo(g.left < g.segs[g.k].sec - 3 ? g.k : g.k - 1); return; }
     if (a === 'c-sound' && ui.guide) { ui.guide.sound = !ui.guide.sound; if (!ui.guide.sound && window.speechSynthesis) window.speechSynthesis.cancel(); renderGuide(); return; }
     if (a === 'start') {

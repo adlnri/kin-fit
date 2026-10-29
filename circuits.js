@@ -29,7 +29,7 @@
       why: 'Une paire d’haltères suffit : mouvements polyarticulaires enchaînés pour la force et le cardio en même temps.' },
   };
 
-  TYPES.mobilite = { name: 'Mobilité', icon: 'stretch', kit: 'corps', met: 2.5, stations: [{ id: 'chat' }, { id: 'worlds' }, { id: 'psoas' }, { id: 'ischio' }, { id: 'pont' }, { id: 'superman' }, { id: 'enfant' }, { id: 'deadbug' }],
+  TYPES.mobilite = { name: 'Mobilité', icon: 'stretch', kit: 'corps', met: 2.5, chrono: true, stations: [{ id: 'chat' }, { id: 'worlds' }, { id: 'psoas' }, { id: 'ischio' }, { id: 'pont' }, { id: 'superman' }, { id: 'enfant' }, { id: 'deadbug' }],
     why: 'Des positions tenues et des mouvements lents pour délier hanches, dos et épaules : parfait les jours de repos ou après une séance.' };
 
   // Hyrox stations by equipment, most important first: the list is cut to the number of blocks.
@@ -39,6 +39,20 @@
     corps: ['burpee_saut', 'traction', 'jumpsq', 'dips', 'climber', 'fente_av', 'bench', 'planche'],
   };
   const SPEED = [9, 10.5, 12]; // km/h on the runs, by level
+  // "Pour le temps": what to do at each station, by level (débutant, intermédiaire, avancé). Numbers are reps.
+  const TARGET = {
+    traineau: ['25 m', '40 m', '50 m'], rameur: ['500 m', '750 m', '1 000 m'], farmer: ['100 m', '150 m', '200 m'], planche: ['30 s', '45 s', '60 s'],
+    burpee_saut: [10, 15, 20], traction: [5, 8, 12], dips: [8, 12, 15], wallball: [20, 30, 40], fente_av: [16, 20, 24], thruster: [12, 15, 20], swing: [15, 20, 25],
+    climber: [30, 40, 50], jumpsq: [12, 15, 20], bench: [10, 15, 20], squat: [12, 15, 20], row: [10, 12, 15], pont: [15, 20, 25], fente: [10, 12, 14], ohp: [10, 12, 15], rdl: [10, 12, 15],
+    jacks: [30, 40, 50], genoux: [30, 40, 50], burpee: [8, 10, 12], patineur: [20, 24, 30], corde: [50, 75, 100], shadow: ['30 s', '45 s', '60 s'], sprint: ['20 s', '30 s', '30 s'],
+  };
+  function target(id, lv) {
+    const t = TARGET[id]; const ex = NA.E[id];
+    const v = t ? t[lv] : ex && typeof ex.r === 'number' ? ex.r + (lv - 1) * 2 : ex ? ex.r : 10;
+    return typeof v === 'number' ? `${v} répétitions` : v;
+  }
+  const RUN = { course: [600, 800, 1000], rameur: [500, 750, 1000] };
+  const dist = (m) => (m >= 1000 ? `${String(m / 1000).replace('.', ',')} km` : `${m} m`);
   const STATION = [60, 75, 90]; // seconds per station, by level
 
   const WARM = ['Rotations des épaules et des hanches, 1 min', 'Marche puis trot sur place, 2 min', 'Squats et fentes lents à vide, 1 min', 'Montées de genoux légères, 1 min'];
@@ -59,7 +73,7 @@
   }
 
   // Hyrox: n blocks of one run then one station, in a single pass.
-  function hyrox(p, T, D, warm, cool) {
+  function hyrox(p, T, D, warm, cool, ft) {
     const m = p.materiel || []; const lv = NA.lvIdx(p.niveau);
     const kit = m.includes('salle') ? 'salle' : m.includes('halteres') ? 'halteres' : 'corps';
     const knee = /genou/i.test(p.restrictions || '');
@@ -71,29 +85,43 @@
     const leg = station({ id: runId }, 'auto', p);
     const mins = String(run).replace('.', ',');
     const runTxt = `${mins} min de ${runId === 'rameur' ? 'rameur' : knee ? 'marche rapide' : 'course'}`;
+    const legDist = dist((RUN[runId] || RUN.course)[lv] - (knee && runId === 'course' ? 200 : 0));
     const seq = [];
     HYROX[kit].slice(0, n).forEach((id) => {
-      seq.push({ ...leg, run: true, meta: knee ? runTxt : `${runTxt} · environ ${meters} m` });
-      const s = station({ id }, 'auto', p); seq.push({ ...s, meta: `${st} s de station · ${s.load}` });
+      seq.push({ ...leg, run: true, meta: ft ? `${legDist} de ${runId === 'rameur' ? 'rameur' : knee ? 'marche rapide' : 'course'}` : knee ? runTxt : `${runTxt} · environ ${meters} m` });
+      const s = station({ id }, 'auto', p); seq.push({ ...s, meta: ft ? `${target(id, lv)} · ${s.load}` : `${st} s de station · ${s.load}` });
     });
+    if (ft) {
+      return { rounds: 1, stations: seq, missing: false, timing: null,
+        sub: `${n} blocs course et station · le plus vite possible · ≈ ${NA.burnOf(T.met, p, D)} kcal`,
+        part: `Les blocs · ${n} courses et ${n} stations`,
+        facts: [['Format', 'Pour le temps'], ['Course', legDist], ['Blocs', String(n)], ['Objectif', 'Le plus vite possible']] };
+    }
     return { rounds: 1, stations: seq, missing: false, timing: { run: Math.round(run * 60), st, tr },
       sub: `${D} min · ${n} blocs course et station · ≈ ${NA.burnOf(T.met, p, D)} kcal`,
       part: `Les blocs · ${n} courses et ${n} stations`,
       facts: [['Course', knee ? `${mins} min` : `${mins} min · ${meters} m`], ['Station', `${st} s`], ['Transition', `${tr} s`], ['Blocs', String(n)]] };
   }
 
-  function build(p, type, dur) {
+  function build(p, type, dur, mode) {
     const T = TYPES[type] || TYPES.hyrox; const D = NA.DUREES.includes(+dur) ? +dur : NA.durOf(p);
+    const ft = mode === 'temps' && !T.chrono; const lv = NA.lvIdx(p.niveau);
     const pace = PACE[NA.lvIdx(p.niveau)];
     const warm = D >= 60 ? 8 : 5; const cool = D >= 60 ? 7 : 5;
     const base = { type: TYPES[type] ? type : 'hyrox', name: T.name, icon: T.icon, why: T.why, duree: D, pace, warm, cool, kcal: NA.burnOf(T.met, p, D),
-      warmList: WARM, coolList: COOL, knee: /genou/i.test(p.restrictions || '') };
-    if (T.hyrox) return { ...base, ...hyrox(p, T, D, warm, cool) };
+      warmList: WARM, coolList: COOL, knee: /genou/i.test(p.restrictions || ''), mode: ft ? 'temps' : 'chrono' };
+    if (T.hyrox) return { ...base, ...hyrox(p, T, D, warm, cool, ft) };
     const n = D <= 30 ? 6 : 8;
     const lap = n * (pace.on + pace.off);
     const rounds = Math.max(2, Math.round(((D - warm - cool) * 60 + pace.rest) / (lap + pace.rest)));
-    const stations = T.stations.slice(0, n).map((st) => { const s = station(st, T.kit, p); return { ...s, meta: `${pace.on} s d’effort · ${pace.off} s de repos · ${s.load}` }; });
+    const stations = T.stations.slice(0, n).map((st) => { const s = station(st, T.kit, p); return { ...s, meta: ft ? `${target(st.id || st.move, lv)} · ${s.load}` : `${pace.on} s d’effort · ${pace.off} s de repos · ${s.load}` }; });
     const missing = T.kit === 'halteres' && !p.materiel.some((m) => m === 'halteres' || m === 'salle');
+    if (ft) {
+      return { ...base, rounds, stations, missing,
+        sub: `${rounds} tours · ${stations.length} exercices · le plus vite possible · ≈ ${base.kcal} kcal`,
+        part: `Le circuit · ${rounds} tours`,
+        facts: [['Format', 'Pour le temps'], ['Tours', String(rounds)], ['Exercices', String(stations.length)], ['Objectif', 'Le plus vite possible']] };
+    }
     return { ...base, rounds, stations, missing,
       sub: `${D} min · ${rounds} tours · ${stations.length} exercices · ≈ ${base.kcal} kcal`,
       part: `Le circuit · ${rounds} tours`,
