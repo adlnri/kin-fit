@@ -152,7 +152,7 @@
   const lg = (sess, d) => { sess.log[d] = sess.log[d] || { ex: [], pdj: false, eau: 0, mob: false, status: '' }; return sess.log[d]; };
 
   const ui = { view: 'today', day: todayIdx, ob: null, defisTab: 'jour', planTab: 'programme', confirmDelete: false, printing: false, aiBusy: null, circuit: 'hyrox', circuitDur: null };
-  const blank = () => ({ prenom: '', sexe: '', age: '', taille: '', poids: '', objectif: '', niveau: 50, seances: 3, duree: 60, materiel: [], restrictions: '', sports: [], autre: '', petitdej: '', eviter: [], regime: 'omni', pratiques: [], cheat: 1, budget: 'moyen', temps: 'libre' });
+  const blank = () => ({ prenom: '', sexe: '', age: '', taille: '', poids: '', objectif: '', depart: '', niveau: 50, seances: 3, duree: 60, materiel: [], restrictions: '', sports: [], autre: '', petitdej: '', eviter: [], regime: 'omni', pratiques: [], cheat: 1, budget: 'moyen', temps: 'libre' });
 
   /* ---------- Challenges ---------- */
 
@@ -2305,6 +2305,7 @@
 
   /* ---------- Onboarding ---------- */
 
+  const REMISE = 'Remise en forme';
   const STEPS = ['Ton profil', 'Ton niveau', 'Ton sport', 'Ton alimentation', 'Tes repas'];
   const radio = (name, val, label, curv) => `<label class="choice"><input type="radio" name="${name}" value="${val}"${curv === val ? ' checked' : ''}><span>${label}</span></label>`;
   const check = (name, val, label, list) => `<label class="choice"><input type="checkbox" name="${name}" value="${val}"${list.includes(val) ? ' checked' : ''}><span>${label}</span></label>`;
@@ -2318,13 +2319,15 @@
       <div class="row">${num('age', 'Âge', 'ans', p.age, 14, 90)}${num('taille', 'Taille', 'cm', p.taille, 120, 230)}${num('poids', 'Poids', 'kg', p.poids, 35, 220)}</div>
       <fieldset><legend>Objectif</legend><div class="choices">${Object.entries(OBJECTIFS).map(([k, l]) => radio('objectif', k, l, p.objectif)).join('')}</div></fieldset>`;
     if (o.step === 1) return `
+      <fieldset><legend>Aujourd’hui, tu fais du sport ?</legend><div class="choices">${radio('depart', 'zero', 'Pas du tout', p.depart)}${radio('depart', 'un', '1 à 2 fois par semaine', p.depart)}${radio('depart', 'reg', '3 fois ou plus', p.depart)}</div>
+        <p class="hint">Tu pars de zéro ? Parfait : on commence en douceur, avec 2 ou 3 séances courtes, sans courir ni sauter. Le programme monte avec toi.</p></fieldset>
       <div class="field"><label for="niveau">Niveau sportif : <output id="niveau-out">${lvLabel(p.niveau)}</output></label><input type="range" id="niveau" name="niveau" min="0" max="100" value="${p.niveau}"><p class="hint">De débutant à avancé. Tu pourras l’ajuster à tout moment.</p></div>
       <fieldset><legend>Séances par semaine</legend><div class="choices">${[2, 3, 4, 5, 6].map((n) => radio('seances', String(n), String(n), String(p.seances))).join('')}</div></fieldset>
       <fieldset><legend>Durée d’une séance, échauffement compris</legend><div class="choices">${DUREES.map((n) => radio('duree', String(n), `${n} min`, String(durOf(p)))).join('')}</div></fieldset>
       <fieldset><legend>Matériel disponible (plusieurs choix possibles)</legend><div class="choices">${Object.entries(MATERIEL).map(([k, l]) => check('materiel', k, l, p.materiel)).join('')}</div></fieldset>
       <div class="field"><label for="restrictions">Pathologies, douleurs ou restrictions (facultatif)</label><textarea id="restrictions" name="restrictions" placeholder="Exemple : douleur au genou droit">${esc(p.restrictions)}</textarea></div>`;
     if (o.step === 2) return `
-      <fieldset><legend>Ton ou tes sports (le premier coché oriente le programme et ton défi sport)</legend><div class="choices choices--sport">${SPORTS.map((s) => `<label class="choice"><input type="checkbox" name="sports" value="${s}"${p.sports.includes(s) ? ' checked' : ''}><span>${icon(SPORT_ICON[s] || 'bolt')}${s === 'JJB' ? 'JJB (Jiu-Jitsu Brésilien)' : s}</span></label>`).join('')}</div></fieldset>
+      <fieldset><legend>Ton ou tes sports (le premier coché oriente le programme et ton défi sport)</legend><div class="choices choices--sport"><label class="choice"><input type="checkbox" name="aucun" value="1"${!p.sports.length && p.autre === REMISE ? ' checked' : ''}><span>${icon('heart')}Aucun pour l’instant : me remettre en forme</span></label>${SPORTS.map((s) => `<label class="choice"><input type="checkbox" name="sports" value="${s}"${p.sports.includes(s) ? ' checked' : ''}><span>${icon(SPORT_ICON[s] || 'bolt')}${s === 'JJB' ? 'JJB (Jiu-Jitsu Brésilien)' : s}</span></label>`).join('')}</div></fieldset>
       <div class="field"><label for="autre">Autre sport (facultatif)</label><input type="text" id="autre" name="autre" value="${esc(p.autre)}" placeholder="Exemple : escalade"></div>`;
     if (o.step === 3) return `
       <fieldset><legend>Ton régime</legend><div class="choices">${Object.entries(M.REGIMES).map(([k, l]) => radio('regime', k, l, p.regime || 'omni')).join('')}</div></fieldset>
@@ -2384,8 +2387,8 @@
   function collect() {
     const f = $('#ob-form'); const p = ui.ob.p; const fd = new FormData(f);
     if (ui.ob.step === 0) { p.prenom = (fd.get('prenom') || '').trim(); p.sexe = fd.get('sexe') || ''; ['age', 'taille', 'poids'].forEach((k) => { p[k] = fd.get(k) ? +fd.get(k) : ''; }); p.objectif = fd.get('objectif') || ''; }
-    if (ui.ob.step === 1) { p.niveau = +fd.get('niveau'); p.seances = +(fd.get('seances') || 0); p.duree = +(fd.get('duree') || 60); p.materiel = fd.getAll('materiel'); p.restrictions = fd.get('restrictions') || ''; }
-    if (ui.ob.step === 2) { p.sports = fd.getAll('sports'); p.autre = (fd.get('autre') || '').trim(); }
+    if (ui.ob.step === 1) { p.depart = fd.get('depart') || ''; p.niveau = p.depart === 'zero' ? Math.min(+fd.get('niveau'), 10) : +fd.get('niveau'); p.seances = +(fd.get('seances') || 0); p.duree = +(fd.get('duree') || 60); p.materiel = fd.getAll('materiel'); p.restrictions = fd.get('restrictions') || ''; }
+    if (ui.ob.step === 2) { p.sports = fd.getAll('sports'); p.autre = (fd.get('autre') || '').trim(); if (fd.get('aucun') && !p.sports.length && !p.autre) p.autre = REMISE; }
     if (ui.ob.step === 3) { p.regime = fd.get('regime') || 'omni'; p.pratiques = fd.getAll('pratiques'); p.eviter = fd.getAll('eviter'); }
     if (ui.ob.step === 4) { p.petitdej = fd.get('petitdej') || ''; p.cheat = +(fd.get('cheat') ?? 1); p.budget = fd.get('budget') || 'moyen'; p.temps = fd.get('temps') || 'libre'; }
   }
@@ -2401,10 +2404,13 @@
       if (!p.objectif) return 'Choisis un objectif.';
     }
     if (s === 1) {
+      if (!p.depart) return 'Dis-nous si tu fais déjà du sport : le programme part de là.';
       if (!p.seances) return 'Choisis ton nombre de séances par semaine.';
+      if (p.depart === 'zero' && p.seances > 3) return 'Pour démarrer, choisis 2 ou 3 séances par semaine. Tu pourras en ajouter dès que ce sera facile.';
+      if (p.depart === 'zero' && p.duree > 45) return 'Pour démarrer, 30 ou 45 minutes par séance suffisent. Tu pourras allonger ensuite.';
       if (!p.materiel.length) return 'Coche au moins un type de matériel. Sans rien, coche « Poids du corps ».';
     }
-    if (s === 2 && !p.sports.length && !p.autre) return 'Coche au moins un sport, ou écris le tien dans « Autre sport ».';
+    if (s === 2 && !p.sports.length && !p.autre) return 'Coche au moins un sport, « Aucun pour l’instant », ou écris le tien dans « Autre sport ».';
     if (s === 4 && !p.petitdej) return 'Choisis un type de petit-déjeuner : salé, sucré ou sucré-salé.';
     return '';
   }
@@ -2414,7 +2420,7 @@
     return `<div class="save-step">
       <p class="label">Dernière étape · facultative</p>
       <h1 class="h1" id="save-title" tabindex="-1">Sauvegarde ton profil, ${esc(sess.profile.prenom)}</h1>
-      <ul class="save-perks"><li>${icon('check')}Ton programme et ta progression en sécurité, même si tu changes de téléphone</li><li>${icon('check')}Des défis avec tes amis, où qu’ils soient</li><li>${icon('check')}Gratuit, sans mot de passe : un lien par e-mail suffit</li></ul>
+      <ul class="save-perks"><li>${icon('check')}Ton programme et ta progression en sécurité, même si tu changes de téléphone</li><li>${icon('check')}Des défis avec tes amis, où qu’ils soient</li><li>${icon('check')}Gratuit, sans mot de passe : un code par e-mail suffit</li></ul>
       ${accountCard(sess)}
       <button type="button" class="btn btn--ghost save-later" data-act="save-later">Plus tard</button>
       <p class="hint">Tu pourras créer ton compte à tout moment dans Profil.</p>
@@ -2836,6 +2842,13 @@
   document.addEventListener('input', (e) => {
     if (e.target.matches('[data-level]')) updateLevel(+e.target.value);
     if (e.target.id === 'niveau') $('#niveau-out').textContent = lvLabel(+e.target.value);
+    // Starting from zero: set a gentle start on screen right away (beginner, 3 sessions at most, 30 min).
+    if (e.target.name === 'depart' && e.target.value === 'zero') {
+      const f = e.target.form; const lv = f.querySelector('#niveau'); const pick = (n, v) => { const r = f.querySelector(`[name="${n}"][value="${v}"]`); if (r) r.checked = true; };
+      if (lv && +lv.value > 10) { lv.value = 0; $('#niveau-out').textContent = lvLabel(0); }
+      const s = f.querySelector('[name="seances"]:checked'); if (!s || +s.value > 3) pick('seances', 3);
+      const d = f.querySelector('[name="duree"]:checked'); if (!d || +d.value > 45) pick('duree', 30);
+    }
   });
 
   document.addEventListener('submit', (e) => {

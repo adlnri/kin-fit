@@ -85,6 +85,9 @@
 
   const ZONE2 = { type: 'Endurance fondamentale', duree: 35, format: '35 min en continu, allure où tu peux parler', obj: 'Construire la base aérobie et accélérer la récupération', conseils: 'Course, vélo ou rameur. Si tu ne peux plus dire une phrase entière, ralentis.', q: 'endurance fondamentale zone 2 explication', vids: ['course', 'velo', 'rameur'] };
 
+  // Starting from zero: brisk walking first, no running and no jumping.
+  const START = { type: 'Marche active', duree: 25, format: '5 min de marche tranquille, puis 6 × (2 min de marche rapide / 1 min de marche normale), 2 min pour finir', obj: 'Habituer le cœur et les articulations à l’effort, sans courir', conseils: 'Tu dois pouvoir parler en marchant vite. Quand ça devient facile, remplace la marche rapide par un petit trot.', q: 'marche active débutant', vids: ['course'] };
+
   const BODY3 = ['3 s à la descente', '4 s à la descente', '4 s à la descente, pause 1 s en bas'];
 
   const E = {
@@ -324,7 +327,7 @@
     const p = sess.profile;
     const n = Math.min(6, Math.max(2, +p.seances || 3));
     // Cardio days cycle through the cardio of each chosen sport, then an easy endurance day.
-    const cardios = [...new Set(sportsOf(p).map((s) => SPORT[s].cardio)), ZONE2];
+    const cardios = p.depart === 'zero' ? [START] : [...new Set(sportsOf(p).map((s) => SPORT[s].cardio)), ZONE2];
     // With more sports than cardio days, the starting sport moves on each week so every one comes up.
     let mi = 0; let ki = cardios.length > 2 ? Math.floor(Date.now() / 6048e5) % cardios.length : 0;
     const items = ORDER[n].map((c, i) => {
@@ -336,7 +339,7 @@
         if (extra >= 5) { c.duree = D; c.format = `${k.format}. Échauffement 10 min, puis ${extra} min d’endurance facile pour finir`; }
         if (D < k.duree) { c.duree = D; c.format = `${k.format}. Version ${D} min : même rythme, moins de blocs, 3 min d’échauffement`; }
         // The base format at its own intensity; any added warm-up and easy endurance at MET 5.
-        const met = k === ZONE2 ? 6 : 8;
+        const met = k === START ? 4.5 : k === ZONE2 ? 6 : 8;
         c.kcal = c.duree <= k.duree ? burnOf(met, p, c.duree) : burnOf(met, p, k.duree) + burnOf(5, p, c.duree - k.duree);
         return c;
       }
