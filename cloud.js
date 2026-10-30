@@ -18,6 +18,7 @@
       if (error.code === '23514') throw fail('pseudo_invalid', error);
       if (error.status === 429 || /rate limit|too many/i.test(msg)) throw fail('rate_limited', error);
       if (/sending|smtp|email.*(send|deliver)|confirmation email|magic link/i.test(msg)) throw fail('email_send', error);
+      if (/(token|otp).*(expired|invalid)|invalid.*(token|otp)/i.test(msg)) throw fail('bad_code', error);
       if (/signups? not allowed|signup.*disabled/i.test(msg)) throw fail('signup_disabled', error);
       if (/fetch|network|load failed/i.test(msg)) throw fail('network', error);
       throw fail('server', error);
@@ -69,6 +70,11 @@
   async function signInEmail(email) {
     const c = await sb();
     check(await c.auth.signInWithOtp({ email, options: { emailRedirectTo: here(), shouldCreateUser: true } }));
+  }
+  // The same e-mail also carries a code: typing it signs in right here, in the browser or app that holds the progress.
+  async function verifyCode(email, token) {
+    const c = await sb();
+    check(await c.auth.verifyOtp({ email, token, type: 'email' }));
   }
   async function signInGoogle() {
     const c = await sb();
@@ -136,7 +142,7 @@
     get plus() { return plusActive(); }, get plusUntil() { return st.profile && st.profile.plus_until; }, token,
     get user() { return st.user; }, get profile() { return st.profile; }, get signedIn() { return !!st.user; }, get linked() { return !!(st.user && st.profile); },
     start, onChange: (f) => st.listeners.push(f),
-    signInEmail, signInGoogle, signOut, createProfile, push, pull,
+    signInEmail, verifyCode, signInGoogle, signOut, createProfile, push, pull,
     friends, requestFriend, acceptFriend, removeFriend,
     challenges, createChallenge, setProgress, respond, board, exportData, deleteAccount,
   };

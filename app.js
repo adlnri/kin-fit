@@ -912,6 +912,7 @@
     const daily = dailyList(sess, ui.day);
     const water = daily.find((c) => c.mode === 'water');
     return `${pendingBanner()}
+      ${installTodayCard()}
       ${hero(sv, item, daily, date, future)}
       <div class="hello hello--today">${scorebar(sess)}</div>
       <div class="week" role="group" aria-label="Semaine">${week}</div>
@@ -1325,6 +1326,26 @@
   window.addEventListener('appinstalled', () => { installEvt = null; toast('Kin Fit est installée.'); if (ui.view === 'profil') render(); });
   const standalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isPhone = () => isIOS() || /android|mobile/i.test(navigator.userAgent);
+  // Links opened from Snapchat, Instagram, TikTok or Facebook land in their own browser, which cannot install the app
+  // and loses everything once the e-mail opens Safari.
+  const inAppBrowser = () => /snapchat|instagram|fban|fbav|fb_iab|tiktok|musical_ly|bytedance|line\//i.test(navigator.userAgent);
+  const inAppNote = () => !inAppBrowser() ? '' : `<div class="note note--inapp" role="note"><p><b>Ouvre Kin Fit dans ${isIOS() ? 'Safari' : 'ton navigateur'}.</b></p>
+      <p>Tu es dans le navigateur d’une autre app (Snapchat, Instagram…) : tes informations n’y seraient pas gardées et l’app ne peut pas s’installer.</p>
+      <p>Touche le menu ••• ou ⋮ en haut, puis « Ouvrir dans ${isIOS() ? 'Safari' : 'le navigateur'} ».</p></div>`;
+  function installTodayCard() {
+    if (inAppBrowser()) return inAppNote();
+    if (standalone() || !isPhone()) return '';
+    try { const d = localStorage.getItem('kinfit.installLater'); if (d && (TODAY - new Date(d)) / 864e5 < 7) return ''; } catch (e) { /* show it */ }
+    const steps = installEvt ? `<div class="actions"><button type="button" class="btn" data-act="install">${icon('share')}Installer l’app</button><button type="button" class="btn btn--ghost" data-act="install-later">Plus tard</button></div>`
+      : `<ol class="install-steps">${isIOS() ? '<li>Ouvre Kin Fit dans Safari.</li><li>Touche le bouton Partager, en bas de l’écran.</li><li>Choisis « Sur l’écran d’accueil », puis « Ajouter ».</li>'
+        : '<li>Ouvre le menu du navigateur (les trois points).</li><li>Choisis « Installer l’application » ou « Ajouter à l’écran d’accueil ».</li>'}<li>Ouvre ensuite Kin Fit depuis sa nouvelle icône.</li></ol>
+        <div class="actions"><button type="button" class="btn btn--ghost" data-act="install-later">Plus tard</button></div>`;
+    return `<article class="card install-card"><header class="card-head"><span class="chip-ico">${icon('home')}</span><div><h2 class="h2">Installe Kin Fit sur ton téléphone</h2><p class="muted">Gratuit, sans passer par l’App Store</p></div></header>
+      <p>Kin Fit s’ouvre ici dans le navigateur. Installée, elle a son icône, s’ouvre en plein écran et marche sans connexion.</p>
+      ${isIOS() ? '<p class="hint">Installe-la avant de créer ton compte : sur iPhone, l’app installée ne reprend pas les données de Safari. Ensuite, connecte-toi dans l’app avec le code reçu par e-mail.</p>' : ''}
+      ${steps}</article>`;
+  }
   function installCard() {
     let body;
     if (standalone()) body = '<p>Kin Fit est installée sur cet appareil. Elle fonctionne aussi hors connexion.</p>';
@@ -1342,6 +1363,7 @@
     not_found: 'Aucun compte avec ce pseudo. Vérifie l’orthographe.',
     network: 'Pas de connexion. Réessaie quand tu as du réseau.',
     offline: 'Le service de comptes ne répond pas. Réessaie plus tard.',
+    bad_code: 'Code incorrect ou expiré. Vérifie-le, ou demande un nouvel e-mail.',
     rate_limited: 'Trop de liens demandés en peu de temps. Attends quelques minutes (jusqu’à une heure) avant de réessayer.',
     email_send: 'Le serveur n’arrive pas à envoyer l’e-mail de connexion. Vérifie les réglages SMTP dans Supabase (adresse Gmail et mot de passe d’application).',
     signup_disabled: 'Les inscriptions sont fermées dans Supabase (Authentication › Sign In / Providers).',
@@ -1419,15 +1441,20 @@
     } catch (e) { /* offline: keep what we have */ }
   }
 
-  const loginForm = () => `<form id="login-form" class="ai-block" novalidate>
+  const loginForm = () => ui.loginEmail ? `<form id="code-form" class="ai-block" novalidate>
+      <div class="note note--mail"><p><b>E-mail envoyé à</b></p><p class="mail-to">${esc(ui.loginEmail)}</p>
+        <p><b>Pas reçu d’ici une minute ? Regarde dans tes spams (courrier indésirable).</b></p><p>Marque-le « Non indésirable » : les prochains arriveront dans ta boîte de réception.</p></div>
+      <div class="field"><label for="login-code">Code reçu par e-mail</label><input class="input input--code" id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456"><p class="hint">Tape le code ici, sans quitter cette page : tes informations restent sur ce téléphone.</p></div>
+      <div class="actions"><button type="submit" class="btn">Valider le code</button><button type="button" class="btn btn--ghost" data-act="login-resend">Renvoyer l’e-mail</button><button type="button" class="btn btn--ghost" data-act="login-reset">Changer d’e-mail</button></div>
+      <p class="hint ai-status" id="code-status" role="status"></p></form>` : `<form id="login-form" class="ai-block" novalidate>
       <div class="field"><label for="login-email">Ton e-mail</label><input class="input" id="login-email" type="email" autocomplete="email" inputmode="email" placeholder="prenom@exemple.fr"></div>
-      <div class="actions"><button type="submit" class="btn">Recevoir le lien de connexion</button>${CLOUD.google ? '<button type="button" class="btn btn--ghost" data-act="login-google">Continuer avec Google</button>' : ''}</div>
+      <div class="actions"><button type="submit" class="btn">Recevoir mon code par e-mail</button>${CLOUD.google ? '<button type="button" class="btn btn--ghost" data-act="login-google">Continuer avec Google</button>' : ''}</div>
       <p class="hint ai-status" id="login-status" role="status"></p></form>`;
 
   function accountCard(sess) {
     if (!CLOUD.enabled) return '';
     const u = CLOUD.user; const pr = CLOUD.profile; let body;
-    if (!u) body = `<p>Facultatif et gratuit : sauvegarde ta progression, retrouve-la sur tous tes appareils et défie tes amis où qu’ils soient. Pas de mot de passe : tu reçois un lien par e-mail.</p>${loginForm()}`;
+    if (!u) body = `<p>Facultatif et gratuit : sauvegarde ta progression, retrouve-la sur tous tes appareils et défie tes amis où qu’ils soient. Pas de mot de passe : tu reçois un code par e-mail.</p>${inAppNote()}${standalone() || !isPhone() || inAppBrowser() ? '' : '<p class="hint">Conseil : installe d’abord l’app (carte en haut d’Aujourd’hui), puis connecte-toi depuis l’app.</p>'}${loginForm()}`;
     else if (!pr) body = `<form id="pseudo-form" class="ai-block" novalidate><p>Connecté avec ${esc(u.email || 'ton compte')}. Choisis ton pseudo : c’est lui que tes amis chercheront.</p>
         <div class="field"><label for="pseudo">Pseudo</label><input class="input" id="pseudo" type="text" maxlength="20" autocomplete="nickname" autocapitalize="off" spellcheck="false" placeholder="adil_fit"><p class="hint">3 à 20 caractères : lettres, chiffres, point, tiret ou tiret bas.</p></div>
         <label class="consent"><input type="checkbox" id="consent"><span>J’accepte que Kin Fit enregistre mon profil sportif et ma progression, y compris des données de santé (poids, douleurs, allergies), pour me les rendre sur mes appareils. Je peux les exporter ou les supprimer à tout moment. <a href="confidentialite.html" target="_blank" rel="noopener">Politique de confidentialité</a></span></label>
@@ -2342,6 +2369,7 @@
         <div class="ob-stickers" aria-hidden="true">${preview}</div>
       </div>
       <form class="ob-form" id="ob-form" novalidate>
+        ${o.step === 0 ? inAppNote() : ''}
         <ol class="steps" aria-label="Étapes">${STEPS.map((s, i) => `<li${i === o.step ? ' aria-current="step"' : ''}${i < o.step ? ' class="done"' : ''}><span>${i < o.step ? icon('check') : i + 1}</span>${s}</li>`).join('')}</ol>
         <h1 class="h1" id="ob-title" tabindex="-1">${STEPS[o.step]}</h1>
         ${stepFields(o)}
@@ -2641,6 +2669,9 @@
       catch (err) { if (err && /23505|duplicate/i.test(`${err.cause && err.cause.code} ${err.detail}`)) { state.pendingFriend = null; save(); render(); toast('Vous êtes déjà en lien.'); } else toast(cloudErr(err)); }
       return;
     }
+    if (a === 'login-reset') { ui.loginEmail = null; render(); return refocus('#login-email'); }
+    if (a === 'login-resend' && ui.loginEmail) { try { await CLOUD.signInEmail(ui.loginEmail); toast('Nouvel e-mail envoyé. Regarde aussi dans tes spams.'); } catch (err) { toast(cloudErr(err)); } return; }
+    if (a === 'install-later') { try { localStorage.setItem('kinfit.installLater', iso(TODAY)); } catch (err) { /* shown again next time */ } render(); return; }
     if (a === 'login-google') { try { await CLOUD.signInGoogle(); } catch (err) { toast(cloudErr(err)); } return; }
     if (a === 'logout') { await CLOUD.signOut().catch(() => {}); ui.friends = null; render(); toast('Déconnecté. Tes données restent sur cet appareil.'); return; }
     if (a === 'sync-now') { await cloudPush(true); await refreshSocial(); render(); toast('Progression synchronisée.'); return; }
@@ -2854,7 +2885,15 @@
       e.preventDefault(); const email = $('#login-email').value.trim(); const st = $('#login-status'); const btn = e.target.querySelector('[type="submit"]');
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { st.textContent = 'Entre une adresse e-mail valide.'; return; }
       btn.disabled = true; st.textContent = 'Envoi du lien…';
-      CLOUD.signInEmail(email).then(() => { st.textContent = `Lien envoyé à ${email}. Ouvre-le sur cet appareil pour te connecter (pense à regarder les indésirables).`; })
+      CLOUD.signInEmail(email).then(() => { ui.loginEmail = email; render(); refocus('#login-code'); })
+        .catch((err) => { btn.disabled = false; st.textContent = cloudErr(err); });
+      return;
+    }
+    if (e.target.id === 'code-form') {
+      e.preventDefault(); const code = $('#login-code').value.replace(/\s/g, ''); const st = $('#code-status'); const btn = e.target.querySelector('[type="submit"]');
+      if (!/^\d{6,10}$/.test(code)) { st.textContent = 'Entre le code à 6 chiffres reçu par e-mail.'; return; }
+      btn.disabled = true; st.textContent = 'Vérification…';
+      CLOUD.verifyCode(ui.loginEmail, code).then(() => { ui.loginEmail = null; render(); toast('Connecté.'); })
         .catch((err) => { btn.disabled = false; st.textContent = cloudErr(err); });
       return;
     }

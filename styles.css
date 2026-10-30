@@ -1120,4 +1120,12 @@ body:is([data-view="welcome"], [data-view="onboarding"]) .ob-login { grid-column
 .board-rank { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-3); font-weight: 800; }
 .board-list li:first-child .board-rank { background: var(--gold); color: var(--on); box-shadow: 0 0 14px rgba(198, 255, 0, .5); }
 .board-list b { color: var(--gold-hi); }
+/* Sign-in code, install card, in-app browser warning */
+.note--mail { border-color: var(--pink); }
+.note--mail .mail-to { font-weight: 700; color: var(--gold-hi); word-break: break-all; }
+.note--inapp { border-color: var(--pink); background: rgba(255, 46, 136, .1); margin-bottom: 14px; }
+.input--code { font-size: 1.5rem; letter-spacing: .3em; text-align: center; font-variant-numeric: tabular-nums; }
+.install-card { border-color: rgba(198, 255, 0, .45); box-shadow: 0 0 24px rgba(198, 255, 0, .12); }
+.install-steps { display: grid; gap: 6px; padding-left: 1.3em; list-style: decimal; }
+.install-steps li { padding-left: 4px; }
 
