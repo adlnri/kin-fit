@@ -149,10 +149,11 @@
   state.sessions.forEach(migrate);
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* in-memory only */ } cloudPush(); };
   const cur = () => state.sessions.find((s) => s.id === state.current) || null;
+  const nutriOn = (sess) => !!(sess && sess.profile.mode === 'nutri');
   const lg = (sess, d) => { sess.log[d] = sess.log[d] || { ex: [], pdj: false, eau: 0, mob: false, status: '' }; return sess.log[d]; };
 
   const ui = { view: 'today', day: todayIdx, ob: null, defisTab: 'jour', planTab: 'programme', confirmDelete: false, printing: false, aiBusy: null, circuit: 'hyrox', circuitDur: null };
-  const blank = () => ({ prenom: '', sexe: '', age: '', taille: '', poids: '', objectif: '', depart: '', niveau: 50, seances: 3, duree: 60, materiel: [], restrictions: '', sports: [], autre: '', petitdej: '', eviter: [], regime: 'omni', pratiques: [], cheat: 1, budget: 'moyen', temps: 'libre' });
+  const blank = () => ({ prenom: '', sexe: '', age: '', taille: '', poids: '', objectif: '', mode: 'complet', activite: '', depart: '', niveau: 50, seances: 3, duree: 60, materiel: [], restrictions: '', sports: [], autre: '', petitdej: '', eviter: [], regime: 'omni', pratiques: [], cheat: 1, budget: 'moyen', temps: 'libre' });
 
   /* ---------- Challenges ---------- */
 
@@ -179,7 +180,11 @@
     const sv = dayView(sess, dayI);
     const p = sess.profile; const d = iso(dayDate(dayI)); const L0 = lg(sess, d); const it = sv.rest ? null : buildPlan(sv).byDay(dayI);
     const out = [];
-    if (it && it.kind === 'muscu') out.push({ key: doneKey(it, d), cat: 'sport', icon: 'dumbbell', pts: 30, title: 'Termine ta séance', desc: it.short, progress: Math.min(L0.ex.length, it.ex.length), target: it.ex.length, unit: 'exercices', mode: 'auto', hint: 'Coche chaque exercice dans Aujourd’hui.' });
+    if (nutriOn(sess)) {
+      const eat = L0.eat || {}; const one = omadOn(sess);
+      const n = one ? +!!L0.pdj : [L0.pdj, eat.dej, eat.diner, eat.snack].filter(Boolean).length + ((L0.foods || []).some((x) => x.slot === 'extra') ? 1 : 0);
+      out.push({ key: `j:repas:${d}`, cat: 'nutrition', icon: 'flame', pts: 20, title: one ? 'Note ton repas' : 'Note tes 3 repas', desc: 'Coche ou ajoute ce que tu manges', progress: Math.min(n, one ? 1 : 3), target: one ? 1 : 3, unit: 'repas', mode: 'auto', hint: 'Se remplit dans « Ta journée ».' });
+    } else if (it && it.kind === 'muscu') out.push({ key: doneKey(it, d), cat: 'sport', icon: 'dumbbell', pts: 30, title: 'Termine ta séance', desc: it.short, progress: Math.min(L0.ex.length, it.ex.length), target: it.ex.length, unit: 'exercices', mode: 'auto', hint: 'Coche chaque exercice dans Aujourd’hui.' });
     else if (it) out.push({ key: doneKey(it, d), cat: 'cardio', icon: 'heart', pts: 30, title: 'Boucle ton cardio', desc: it.type, progress: L0.status === 'faite' ? 1 : 0, target: 1, unit: '', mode: 'tap', act: 'cardio', label: 'Cardio terminé' });
     else out.push({ key: `j:mob:${d}`, cat: 'sport', icon: 'stretch', pts: 15, title: '10 minutes de mobilité', desc: 'Jour de repos actif', progress: L0.mob ? 1 : 0, target: 1, unit: '', mode: 'tap', act: 'mob', label: 'Mobilité faite' });
     out.push({ key: `j:pdj:${d}`, cat: 'nutrition', icon: 'bowl', pts: 10, title: omadOn(sess) ? 'Repas OMAD' : `Petit-déjeuner ${PDJ[p.petitdej]}`, desc: omadOn(sess) ? 'Ton repas unique, dans ta fenêtre' : 'Celui de ton plan, ou son alternative rapide', progress: L0.pdj ? 1 : 0, target: 1, unit: '', mode: 'tap', act: 'pdj', label: 'Je l’ai pris' });
@@ -205,8 +210,8 @@
         { key: `s:seances:${weekId}`, cat: 'sport', icon: 'calendar', pts: 80, title: `${n} séances sur ${n}`, desc: 'Toutes les séances prévues cette semaine', progress: seances, target: n, unit: 'séances', mode: 'auto', hint: 'Se remplit quand tu termines tes séances.' },
         { key: `s:pdj:${weekId}`, cat: 'nutrition', icon: 'bowl', pts: 40, title: 'Cinq matins bien partis', desc: 'Ton petit-déjeuner du plan 5 jours cette semaine', progress: pdj, target: 5, unit: 'matins', mode: 'auto', hint: 'Valide ton petit-déjeuner chaque matin.' },
         { key: `s:eau:${weekId}`, cat: 'eau', icon: 'drop', pts: 40, title: 'Quatre jours hydratés', desc: 'Objectif 2 litres atteint 4 jours', progress: eau, target: 4, unit: 'jours', mode: 'auto', hint: 'Remplis tes 8 verres dans Aujourd’hui.' },
-      ],
-      sport: sportCards,
+      ].filter((c) => !nutriOn(sess) || c.cat !== 'sport'),
+      sport: nutriOn(sess) ? [] : sportCards,
     };
   }
 
@@ -644,6 +649,12 @@
     while (sess.done[`j:pdj:${iso(d)}`] && n < 365) { n += 1; d.setDate(d.getDate() - 1); }
     return n;
   }
+  // Days in a row with the "log your meals" challenge done, ending today or yesterday.
+  function foodStreak(sess) {
+    let n = 0; const d = new Date(TODAY); if (!sess.done[`j:repas:${iso(d)}`]) d.setDate(d.getDate() - 1);
+    while (sess.done[`j:repas:${iso(d)}`] && n < 365) { n += 1; d.setDate(d.getDate() - 1); }
+    return n;
+  }
   const gramsLabel = (it) => { const f = FOOD[it.id]; if (f.unit) { const n = it.g / f.unit; return `${n} ${f.un}${n > 1 ? 's' : ''} · ${it.g} g`; } return `${it.g} g`; };
 
   function breakfastCard(sess, dayItem, L0, opts = {}) {
@@ -656,7 +667,7 @@
     const quick = b.swaps ? `${b.tpl.alt} Remplace les aliments à éviter par ceux de la liste.` : b.tpl.alt;
     const drink = p.eviter.includes('lactose') && p.objectif === 'masse' ? 'Smoothie protéiné : 250 ml de boisson au soja, une poignée de fruits rouges' : DRINK[p.objectif];
     return `<article class="card card--nutrition">
-      <header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Petit-déjeuner ${PDJ[p.petitdej]}</h2><p class="muted">${training ? 'Version jour d’entraînement' : 'Version jour de repos'} · valeurs estimées</p></div></header>
+      <header class="card-head"><span class="chip-ico">${icon('bowl')}</span><div><h2 class="h2">Petit-déjeuner ${PDJ[p.petitdej]}</h2><p class="muted">${nutriOn(sess) ? 'Valeurs estimées' : `${training ? 'Version jour d’entraînement' : 'Version jour de repos'} · valeurs estimées`}</p></div></header>
       ${opts.full ? `<div class="seg" role="group" aria-label="Type de petit-déjeuner">${Object.entries(PDJ).map(([k, l]) => `<button type="button" data-bf="${k}" aria-pressed="${p.petitdej === k}">${l[0].toUpperCase() + l.slice(1)}</button>`).join('')}</div>` : ''}
       <dl class="macros">
         <div class="m-k"><dt>Calories</dt><dd>${b.tot.k}<small> kcal</small></dd></div>
@@ -822,7 +833,16 @@
     </article>`;
   }
 
+  function foodNote(sess) {
+    const { m, got } = foodDay(sess); const left = m.kcal - got;
+    if (!got) return `Ton besoin estimé aujourd’hui : ${m.kcal} kcal. Coche tes repas ou ajoute ce que tu manges au fil de la journée.`;
+    if (left > 150) return `Tu en es à ${got} kcal sur ${m.kcal}. Il te reste environ ${left} kcal pour aujourd’hui.`;
+    if (left >= -150) return `Tu es pile dans ton besoin du jour : ${got} kcal sur ${m.kcal}. Bien joué.`;
+    return `Tu as dépassé ton besoin d’environ ${-left} kcal. Pas de panique : un jour ne fait pas tout. Reprends normalement demain, sans sauter de repas.`;
+  }
+
   function coachNote(sess, dayItem, L0) {
+    if (nutriOn(sess)) return foodNote(sess);
     const p = sess.profile; const prot = Math.round(p.poids * 0.3);
     if (!dayItem) return 'Jour de repos : petit-déjeuner allégé en glucides, priorité au sommeil et à dix minutes de mobilité. Ça compte pour ta médaille « Souple ».';
     if (L0.status === 'manquee') return 'Séance manquée : pas de rattrapage en double. Elle glisse sur ton prochain jour libre et ton petit-déjeuner repasse en version repos. Ta série reprend à la prochaine séance.';
@@ -858,11 +878,11 @@
   /* ---------- Views ---------- */
 
   function scorebar(sess) {
-    const r = rangOf(sess.points); const nx = nextRang(sess.points); const streak = streakOf(sess);
+    const r = rangOf(sess.points); const nx = nextRang(sess.points); const streak = streakOf(sess); const ds = nutriOn(sess) ? foodStreak(sess) : 0;
     const fresh = sess.inbox.filter((x) => x.status === 'new').length;
     return `<div class="scorebar">
       ${fresh ? `<button type="button" class="score score--inbox" data-goto="amis">${icon('inbox')}<b>${fresh}</b> défi${fresh > 1 ? 's' : ''} reçu${fresh > 1 ? 's' : ''}</button>` : ''}
-      <span class="score score--streak" title="Séances prévues réussies d’affilée. Un joker par mois protège ta série si tu manques une séance.">${icon('flame')}<b>${streak}</b> ${streak > 1 ? 'séances' : 'séance'} d’affilée${streak && streakInfo(sess).joker ? '<small class="joker">+1 joker</small>' : ''}</span>
+      ${nutriOn(sess) ? `<span class="score score--streak" title="Jours d’affilée où tu as noté tes repas.">${icon('flame')}<b>${ds}</b> ${ds > 1 ? 'jours suivis' : 'jour suivi'} d’affilée</span>` : `<span class="score score--streak" title="Séances prévues réussies d’affilée. Un joker par mois protège ta série si tu manques une séance.">${icon('flame')}<b>${streak}</b> ${streak > 1 ? 'séances' : 'séance'} d’affilée${streak && streakInfo(sess).joker ? '<small class="joker">+1 joker</small>' : ''}</span>`}
       <span class="score score--pts">${icon('star')}<b>${sess.points}</b> pts${nx ? `<small> · ${nx.min - sess.points} avant ${nx.n}</small>` : ''}</span>
       <button type="button" class="score score--rang" data-view="album" aria-label="Rang ${r.n}, voir les trophées">${window.NA_BADGE ? window.NA_BADGE(r.id, true) : ''}${r.n}</button>
     </div>`;
@@ -894,7 +914,30 @@
     </section>`;
   }
 
+  function viewTodayNutri(sess) {
+    ui.day = todayIdx; const p = sess.profile; const L0 = lg(sess, iso(TODAY));
+    const date = dayDate(todayIdx).toLocaleDateString(window.NA_I18N.locale, { weekday: 'long', day: 'numeric', month: 'long' });
+    const daily = dailyList(sess, todayIdx); const water = daily.find((c) => c.mode === 'water');
+    return `${pendingBanner()}
+      ${installTodayCard()}
+      <header class="hello"><div><h1 class="h1">${new Date().getHours() < 18 ? 'Bonjour' : 'Bonsoir'}, ${esc(p.prenom)}</h1><p class="lede">${esc(date[0].toUpperCase() + date.slice(1))} · Calories, objectif ${OBJECTIFS[p.objectif].toLowerCase()}</p></div></header>
+      <div class="hello hello--today">${scorebar(sess)}</div>
+      <section class="daily" aria-label="Défis du jour">${daily.map((c) => defiCard(c, sess, { readOnly: true })).join('')}</section>
+      <div class="today-grid">
+        <div class="stack">${dayFoodCard(sess)}</div>
+        <div class="stack">
+          ${breakfastCard(sess, null, L0)}
+          ${mealsCard(sess, todayIdx)}
+          <article class="card card--eau"><header class="card-head"><span class="chip-ico">${icon('drop')}</span><div><h2 class="h2">Eau</h2><p class="muted">${water.progress} verre${water.progress > 1 ? 's' : ''} sur 8 · objectif 2 litres</p></div></header>${glasses(water.progress)}</article>
+          <article class="card card--coach"><header class="card-head"><span class="chip-ico">${icon('chat')}</span><div><h2 class="h2">Le mot du coach</h2></div></header>
+            <p aria-live="polite">${esc(foodNote(sess))}</p>
+            <div class="actions"><button type="button" class="btn btn--ghost" data-view="coach">Poser une question</button><button type="button" class="btn btn--ghost" data-act="launch">${icon('send')}Lancer un défi</button></div></article>
+        </div>
+      </div>${foot()}`;
+  }
+
   function viewToday(sess) {
+    if (nutriOn(sess)) return viewTodayNutri(sess);
     const sv = dayView(sess, ui.day);
     const plan = buildPlan(sess); const item = sv.rest ? null : buildPlan(sv).byDay(ui.day);
     const d = dayDate(ui.day); const key = iso(d); const L0 = lg(sess, key);
@@ -934,7 +977,7 @@
 
   function viewDefis(sess) {
     const w = weekList(sess);
-    const tabs = [['jour', 'Jour'], ['semaine', 'Semaine'], ['sport', 'Sport'], ['amis', 'Amis'], ['trophees', 'Trophées']];
+    const tabs = [['jour', 'Jour'], ['semaine', 'Semaine'], ['sport', 'Sport'], ['amis', 'Amis'], ['trophees', 'Trophées']].filter(([k]) => k !== 'sport' || !nutriOn(sess));
     const fresh = sess.inbox.filter((x) => x.status === 'new').length;
     let body = '';
     if (ui.defisTab === 'jour') body = `<div class="defis">${dailyList(sess, todayIdx).map((c) => defiCard(c, sess)).join('')}</div>`;
@@ -1031,8 +1074,9 @@
   }
 
   function profileFacts(p, nutrition) {
-    const rows = [['Sexe', p.sexe === 'femme' ? 'Femme' : 'Homme'], ['Âge', `${p.age} ans`], ['Taille', `${p.taille} cm`], ['Poids', `${p.poids} kg`], ['Objectif', OBJECTIFS[p.objectif]], [nutrition ? 'Sport principal' : 'Sports', nutrition ? sportName(p) : sportList(p)]];
+    const rows = [['Sexe', p.sexe === 'femme' ? 'Femme' : 'Homme'], ['Âge', `${p.age} ans`], ['Taille', `${p.taille} cm`], ['Poids', `${p.poids} kg`], ['Objectif', OBJECTIFS[p.objectif]], p.mode === 'nutri' ? ['Mode', 'Calories seulement'] : [nutrition ? 'Sport principal' : 'Sports', nutrition ? sportName(p) : sportList(p)]];
     if (nutrition) rows.push(['Niveau d’activité', activity(p).label], ['Régime', M.REGIMES[p.regime || 'omni']], ['Pratiques', (p.pratiques || []).map((x) => M.PRATIQUES[x]).join(', ') || 'aucune'], ['Repas plaisir', `${p.cheat ?? 1} par semaine`], ['Budget', M.BUDGETS[p.budget || 'moyen']], ['Temps de cuisine', M.TEMPS[p.temps || 'libre']], ['Mode OMAD', p.omad && p.omad.on ? `Actif, repas à ${p.omad.at}` : 'Non'], ['Région', M.REGIONS[window.NA_I18N.region]]);
+    else if (p.mode === 'nutri') rows.push(['Niveau d’activité', activity(p).label]);
     else rows.push(['Niveau', `<span data-lv>${lvLabel(p.niveau)}</span>`], ['Séances', `${p.seances} par semaine`], ['Durée', `${durOf(p)} min par séance`], ['Matériel', p.materiel.map((m) => MATERIEL[m]).join(', ')]);
     return `<dl class="facts">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${k === 'Niveau' ? v : esc(v)}</dd></div>`).join('')}</dl>`;
   }
@@ -1214,6 +1258,12 @@
   const PLAN_TABS = /<div class="tabs" role="tablist" aria-label="Plan">[\s\S]*?<\/div>/;
 
   function viewSport(sess) {
+    if (nutriOn(sess)) {
+      return `<header class="hello"><div><h1 class="h1">Sport</h1><p class="lede">Tu utilises Kin Fit pour compter tes calories, sans programme sport.</p></div></header>
+        <article class="card"><header class="card-head"><span class="chip-ico">${icon('dumbbell')}</span><div><h2 class="h2">Ajouter un programme sport</h2><p class="muted">Quand tu veux, sans perdre tes repas ni tes points</p></div></header>
+          <p>Réponds à deux questions, ton niveau et ton sport, et Kin Fit te prépare des séances adaptées. Ton besoin en calories tiendra compte de tes entraînements.</p>
+          <div class="actions"><button type="button" class="btn" data-act="sport-on">${icon('dumbbell')}Ajouter le sport</button></div></article>${foot()}`;
+    }
     const t = ui.sportTab || 'programme';
     const tabs = tabBar('Sport', 'data-stab', t, [['programme', 'Programme'], ['parcours', 'Parcours'], ['exercices', 'Exercices']]);
     if (t === 'parcours') return viewParcours(sess, tabs);
@@ -1246,17 +1296,59 @@
   }
   const extraNote = (x) => `<p class="note note--effort">${icon('flame')}<span><b>+${x.kcal} kcal d’effort en plus aujourd’hui.</b> Ajoute-les au dîner : environ ${x.starch} g de féculents cuits en plus et ${x.prot} g de protéines.</span></p>`;
 
-  function dayFoodCard(sess) {
+  function foodDay(sess) {
     const p = sess.profile; const it = buildPlan(dayView(sess, todayIdx)).byDay(todayIdx); const L0 = lg(sess, iso(TODAY)); const eat = L0.eat || {};
     const b = breakfast(p, it ? 1.08 : 0.95); const m = mealsFor(sess, todayIdx);
     const rows = [['pdj', 'Petit-déjeuner', b.tot.k, !!L0.pdj], ['dej', 'Déjeuner', m.dej ? m.dej.k : 0, !!eat.dej], ['diner', 'Dîner', m.diner ? m.diner.k : 0, !!eat.diner], ['snack', 'Collation', Math.round(m.kcal * 0.1), !!eat.snack]];
     if (omadOn(sess)) rows.splice(0, rows.length, ['pdj', 'Repas unique', omadFor(sess, todayIdx).tot.k, !!L0.pdj]);
-    (L0.photos || []).forEach((x) => { const r = rows.find((y) => y[0] === x.slot); if (r) { r[2] = x.kcal; r[3] = true; r[4] = x.plat; } else rows.push(['extra', 'Extra', x.kcal, true, x.plat]); });
+    (L0.photos || []).forEach((x) => { const r = x.slot === 'extra' ? null : rows.find((y) => y[0] === x.slot); if (r) { r[2] = x.kcal; r[3] = true; r[4] = x.plat; r[6] = true; } else rows.push(['extra', 'Extra', x.kcal, true, x.plat, false, true]); });
+    // Foods added by hand replace the plan's estimate for their meal and add up.
+    (L0.foods || []).forEach((x) => {
+      const r = x.slot === 'extra' ? null : rows.find((y) => y[0] === x.slot);
+      if (!r) { rows.push(['extra', 'Extra', x.kcal, true, x.plat, true, false]); return; }
+      if (!r[5]) { r[5] = true; if (!r[6]) { r[2] = 0; r[4] = ''; } }
+      r[2] += x.kcal; r[3] = true; r[4] = [r[4], x.plat].filter(Boolean).join(', ');
+    });
     const ex = effortExtra(sess, iso(TODAY)); if (ex) m.kcal += ex.kcal;
-    const got = rows.reduce((t, r) => t + (r[3] ? r[2] : 0), 0); const C = 2 * Math.PI * 52; const f = Math.min(1, got / (m.kcal || 1));
-    return `<article class="card food-day"><header class="card-head"><span class="chip-ico">${icon('flame')}</span><div><h2 class="h2">Ta journée</h2><p class="muted">${it ? 'Jour d’entraînement' : 'Jour de repos'} · besoin estimé ${m.kcal} kcal</p></div></header>
+    const got = rows.reduce((t, r) => t + (r[3] ? r[2] : 0), 0);
+    return { it, m, rows, ex, got, foods: L0.foods || [] };
+  }
+
+  const SLOTS = [['pdj', 'Petit-déjeuner'], ['dej', 'Déjeuner'], ['diner', 'Dîner'], ['snack', 'Collation'], ['extra', 'Extra']];
+  // Common foods: name, kcal per 100 g, usual portion in grams.
+  const COMMON = [['Pomme', 52, 150], ['Banane', 89, 120], ['Orange', 47, 150], ['Riz cuit', 130, 150], ['Pâtes cuites', 157, 180], ['Pomme de terre cuite', 85, 200], ['Frites', 312, 130],
+    ['Baguette', 270, 60], ['Pain complet', 247, 50], ['Flocons d’avoine', 372, 50], ['Céréales du petit-déjeuner', 380, 40], ['Lentilles cuites', 116, 150], ['Légumes cuits', 30, 200], ['Salade verte', 15, 80], ['Avocat', 160, 100],
+    ['Blanc de poulet cuit', 165, 120], ['Steak haché 5 %', 137, 100], ['Steak haché 15 %', 215, 100], ['Saumon', 208, 120], ['Thon au naturel', 116, 80], ['Jambon blanc', 115, 40], ['Œuf', 143, 55],
+    ['Emmental', 380, 30], ['Camembert', 300, 30], ['Yaourt nature', 60, 125], ['Skyr nature', 63, 150], ['Lait demi-écrémé', 46, 250], ['Beurre', 745, 10], ['Huile d’olive', 900, 10],
+    ['Pizza', 266, 300], ['Burger', 250, 220], ['Kebab', 215, 350], ['Sandwich jambon-beurre', 260, 250], ['Croissant', 406, 60], ['Pain au chocolat', 414, 70],
+    ['Chocolat noir', 546, 20], ['Biscuits', 480, 30], ['Chips', 536, 30], ['Amandes', 579, 30], ['Soda', 42, 330], ['Jus d’orange', 45, 200], ['Bière', 43, 250], ['Vin', 85, 125]];
+  const tt = (x) => (window.NA_I18N && window.NA_I18N.t ? window.NA_I18N.t(x) : x);
+  const findFood = (s) => { const q = String(s || '').trim().toLowerCase(); return q ? COMMON.find((f) => f[0].toLowerCase() === q || tt(f[0]).toLowerCase() === q) : null; };
+
+  function foodLog(foods) {
+    if (!foods.length) return '';
+    return `<div class="food-log"><p class="label">Ajouté à la main</p><ul>${foods.map((x, i) => `<li><span><b data-no-i18n>${esc(x.plat)}</b><small><span>${(SLOTS.find((s) => s[0] === x.slot) || SLOTS[4])[1]}</span>${x.g ? ` · ${x.g} g` : ''} · ${x.kcal} kcal</small></span><button type="button" class="round" data-food-del="${i}" aria-label="Retirer">${icon('x')}</button></li>`).join('')}</ul></div>`;
+  }
+
+  function foodForm() {
+    const h = new Date().getHours(); const def = h < 10 ? 'pdj' : h < 15 ? 'dej' : h < 18 ? 'snack' : 'diner';
+    return `<form class="food-form" id="food-form" novalidate>
+      <h3 class="h3">Ajouter ce que tu as mangé</h3>
+      <div class="field"><label for="food-name">Aliment ou plat</label><input type="text" id="food-name" name="aliment" list="food-list" autocomplete="off" placeholder="Exemple : pomme, riz, pizza"><datalist id="food-list">${COMMON.map((f) => `<option value="${esc(tt(f[0]))}"></option>`).join('')}</datalist></div>
+      <div class="row"><div class="field"><label for="food-g">Quantité</label><div class="unit"><input type="number" id="food-g" name="g" inputmode="numeric" min="1" max="3000"><span>g</span></div></div><div class="field"><label for="food-k">Calories</label><div class="unit"><input type="number" id="food-k" name="k" inputmode="numeric" min="1" max="5000"><span>kcal</span></div></div></div>
+      <fieldset><legend>Pour quel repas ?</legend><div class="choices">${SLOTS.map(([k, l]) => radio('slot', k, l, def)).join('')}</div></fieldset>
+      <p class="hint">Un aliment de la liste : les calories se calculent avec la quantité, ou une portion habituelle si tu la laisses vide. Sinon, recopie les calories de l’étiquette.</p>
+      <p class="error" id="food-error" role="alert"></p>
+      <div class="actions"><button type="submit" class="btn">${icon('check')}Ajouter à ma journée</button></div>
+    </form>`;
+  }
+
+  function dayFoodCard(sess) {
+    const { it, m, rows, ex, got, foods } = foodDay(sess); const C = 2 * Math.PI * 52; const f = Math.min(1, got / (m.kcal || 1));
+    return `<article class="card food-day"><header class="card-head"><span class="chip-ico">${icon('flame')}</span><div><h2 class="h2">Ta journée</h2><p class="muted">${nutriOn(sess) ? 'Calories du jour' : it ? 'Jour d’entraînement' : 'Jour de repos'} · besoin estimé ${m.kcal} kcal</p></div></header>
       <div class="food-top"><div class="hero-ring food-ring" role="img" aria-label="${got} kcal sur ${m.kcal}"><svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="food-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c6ff00"/><stop offset=".45" stop-color="#ff5fa8"/><stop offset="1" stop-color="#ff2e88"/></linearGradient></defs><circle class="ring-track" cx="60" cy="60" r="52"/><circle class="ring-val" cx="60" cy="60" r="52" stroke="url(#food-gold)" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - f)).toFixed(1)}"/></svg><p><b>${got}</b><span>sur ${m.kcal} kcal</span></p></div>
-        <ul class="food-rows">${rows.map(([k, n, kc, ok, ph]) => k === 'extra' ? `<li class="is-on"><span><b>${n}</b><small>${icon('camera')} <span data-no-i18n>${esc(ph)}</span> · ${kc} kcal</small></span></li>` : `<li class="${ok ? 'is-on' : ''}"><span><b>${n}</b><small>${ph ? `${icon('camera')} <span data-no-i18n>${esc(ph)}</span> · ` : '≈ '}${kc} kcal</small></span><span class="food-acts">${k === 'dej' || k === 'diner' ? `${recipeBtn(m[k], 'link-btn')}<button type="button" class="link-btn" data-swap="${k}">Autre idée</button>` : ''}<button type="button" class="btn btn--${ok ? 'done' : 'cat'}" data-eat="${k}" aria-pressed="${ok}">${ok ? icon('check') + 'Mangé' : 'J’ai mangé ça'}</button></span></li>`).join('')}</ul></div>
+        <ul class="food-rows">${rows.map(([k, n, kc, ok, ph, man, cam]) => k === 'extra' ? `<li class="is-on"><span><b>${n}</b><small>${cam ? `${icon('camera')} ` : ''}<span data-no-i18n>${esc(ph)}</span> · ${kc} kcal</small></span></li>` : `<li class="${ok ? 'is-on' : ''}"><span><b>${n}</b><small>${ph ? `${cam ? `${icon('camera')} ` : ''}<span data-no-i18n>${esc(ph)}</span> · ` : '≈ '}${kc} kcal</small></span><span class="food-acts">${!man && (k === 'dej' || k === 'diner') ? `${recipeBtn(m[k], 'link-btn')}<button type="button" class="link-btn" data-swap="${k}">Autre idée</button>` : ''}${man ? `<span class="tag">${icon('check')}Noté</span>` : `<button type="button" class="btn btn--${ok ? 'done' : 'cat'}" data-eat="${k}" aria-pressed="${ok}">${ok ? icon('check') + 'Mangé' : 'J’ai mangé ça'}</button>`}</span></li>`).join('')}</ul></div>
+      ${foodLog(foods)}${foodForm()}
       ${ex ? extraNote(ex) : ''}<div class="meal-photo"><button type="button" class="btn btn--big btn--sheen" data-act="meal-photo">${icon('camera')}Photographier mon repas</button>${CLOUD.plus ? '' : '<span class="tag tag--plus">Plus</span>'}
         <input type="file" id="meal-file" accept="image/*" capture="environment" hidden></div>
     </article>`;
@@ -2306,6 +2398,8 @@
   /* ---------- Onboarding ---------- */
 
   const REMISE = 'Remise en forme';
+  const ACTIVITE = { sed: 'Peu active (assis presque toute la journée)', leger: 'Un peu active (debout ou à pied de temps en temps)', actif: 'Active (debout, à pied, métier physique)' };
+  const obSeq = (p) => (p.mode === 'nutri' ? [0, 3, 4] : [0, 1, 2, 3, 4]);
   const STEPS = ['Ton profil', 'Ton niveau', 'Ton sport', 'Ton alimentation', 'Tes repas'];
   const radio = (name, val, label, curv) => `<label class="choice"><input type="radio" name="${name}" value="${val}"${curv === val ? ' checked' : ''}><span>${label}</span></label>`;
   const check = (name, val, label, list) => `<label class="choice"><input type="checkbox" name="${name}" value="${val}"${list.includes(val) ? ' checked' : ''}><span>${label}</span></label>`;
@@ -2314,6 +2408,11 @@
   function stepFields(o) {
     const p = o.p;
     if (o.step === 0) return `
+      <fieldset><legend>Ce que tu veux faire avec Kin Fit</legend><div class="choices choices--big">
+        <label class="choice"><input type="radio" name="mode" value="complet"${p.mode !== 'nutri' ? ' checked' : ''}><span><b>Sport et nutrition</b><small>Un programme d’entraînement et tes repas</small></span></label>
+        <label class="choice"><input type="radio" name="mode" value="nutri"${p.mode === 'nutri' ? ' checked' : ''}><span><b>Compter mes calories</b><small>Seulement la nutrition, sans séance de sport</small></span></label>
+      </div></fieldset>
+      <fieldset id="act-box"${p.mode === 'nutri' ? '' : ' hidden'}><legend>Ton activité au quotidien</legend><div class="choices">${Object.entries(ACTIVITE).map(([k, l]) => radio('activite', k, l, p.activite)).join('')}</div><p class="hint">Elle sert à calculer ton besoin en calories. Tu pourras ajouter un programme sport plus tard.</p></fieldset>
       <div class="field"><label for="prenom">Prénom</label><input type="text" id="prenom" name="prenom" value="${esc(p.prenom)}" autocomplete="given-name" required></div>
       <fieldset><legend>Sexe</legend><div class="choices">${radio('sexe', 'femme', 'Femme', p.sexe)}${radio('sexe', 'homme', 'Homme', p.sexe)}</div></fieldset>
       <div class="row">${num('age', 'Âge', 'ans', p.age, 14, 90)}${num('taille', 'Taille', 'cm', p.taille, 120, 230)}${num('poids', 'Poids', 'kg', p.poids, 35, 220)}</div>
@@ -2373,7 +2472,7 @@
       </div>
       <form class="ob-form" id="ob-form" novalidate>
         ${o.step === 0 ? inAppNote() : ''}
-        <ol class="steps" aria-label="Étapes">${STEPS.map((s, i) => `<li${i === o.step ? ' aria-current="step"' : ''}${i < o.step ? ' class="done"' : ''}><span>${i < o.step ? icon('check') : i + 1}</span>${s}</li>`).join('')}</ol>
+        <ol class="steps" aria-label="Étapes">${obSeq(o.p).map((si, i, q) => { const at = q.indexOf(o.step); return `<li${si === o.step ? ' aria-current="step"' : ''}${i < at ? ' class="done"' : ''}><span>${i < at ? icon('check') : i + 1}</span>${STEPS[si]}</li>`; }).join('')}</ol>
         <h1 class="h1" id="ob-title" tabindex="-1">${STEPS[o.step]}</h1>
         ${stepFields(o)}
         <p class="error" id="ob-error" role="alert"></p>
@@ -2386,7 +2485,7 @@
 
   function collect() {
     const f = $('#ob-form'); const p = ui.ob.p; const fd = new FormData(f);
-    if (ui.ob.step === 0) { p.prenom = (fd.get('prenom') || '').trim(); p.sexe = fd.get('sexe') || ''; ['age', 'taille', 'poids'].forEach((k) => { p[k] = fd.get(k) ? +fd.get(k) : ''; }); p.objectif = fd.get('objectif') || ''; }
+    if (ui.ob.step === 0) { p.mode = fd.get('mode') === 'nutri' ? 'nutri' : 'complet'; p.activite = fd.get('activite') || ''; p.prenom = (fd.get('prenom') || '').trim(); p.sexe = fd.get('sexe') || ''; ['age', 'taille', 'poids'].forEach((k) => { p[k] = fd.get(k) ? +fd.get(k) : ''; }); p.objectif = fd.get('objectif') || ''; }
     if (ui.ob.step === 1) { p.depart = fd.get('depart') || ''; p.niveau = p.depart === 'zero' ? Math.min(+fd.get('niveau'), 10) : +fd.get('niveau'); p.seances = +(fd.get('seances') || 0); p.duree = +(fd.get('duree') || 60); p.materiel = fd.getAll('materiel'); p.restrictions = fd.get('restrictions') || ''; }
     if (ui.ob.step === 2) { p.sports = fd.getAll('sports'); p.autre = (fd.get('autre') || '').trim(); if (fd.get('aucun') && !p.sports.length && !p.autre) p.autre = REMISE; }
     if (ui.ob.step === 3) { p.regime = fd.get('regime') || 'omni'; p.pratiques = fd.getAll('pratiques'); p.eviter = fd.getAll('eviter'); }
@@ -2402,6 +2501,7 @@
       if (!(p.taille >= 120 && p.taille <= 230)) return 'Indique ta taille en centimètres, entre 120 et 230.';
       if (!(p.poids >= 35 && p.poids <= 220)) return 'Indique ton poids en kilos, entre 35 et 220.';
       if (!p.objectif) return 'Choisis un objectif.';
+      if (p.mode === 'nutri' && !p.activite) return 'Choisis ton activité au quotidien : elle sert à calculer tes calories.';
     }
     if (s === 1) {
       if (!p.depart) return 'Dis-nous si tu fais déjà du sport : le programme part de là.';
@@ -2435,7 +2535,7 @@
     save();
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     $('#app').classList.add('is-onboarding');
-    $('#main').innerHTML = `<div class="loading" role="status"><div class="loading-stk">${stickerArt(STICKERS[0], 1, true, true)}</div><h1 class="h1">On prépare ton programme</h1><p>Programme, petit-déjeuner et premiers défis.</p></div>`;
+    $('#main').innerHTML = `<div class="loading" role="status"><div class="loading-stk">${stickerArt(STICKERS[0], 1, true, true)}</div>${nutriOn(sess) ? '<h1 class="h1">On prépare ta journée</h1><p>Ton besoin en calories, tes repas et tes premiers défis.</p>' : '<h1 class="h1">On prépare ton programme</h1><p>Programme, petit-déjeuner et premiers défis.</p>'}</div>`;
     setTimeout(() => { settle(sess); ui.printing = true; render(); ui.printing = false; }, reduce ? 300 : 1400);
   }
 
@@ -2467,7 +2567,7 @@
     main.classList.toggle('printing', ui.printing);
     main.innerHTML = (views[ui.view] || viewToday)(sess);
     mark(ui.view);
-    if (ui.view === 'today' && sess && !ui.checkinAsked && !todayCheck(sess) && !state.pendingShare && !state.pendingFriend) { ui.checkinAsked = true; setTimeout(openCheckin, 700); }
+    if (ui.view === 'today' && sess && !ui.checkinAsked && !todayCheck(sess) && !nutriOn(sess) && !state.pendingShare && !state.pendingFriend) { ui.checkinAsked = true; setTimeout(openCheckin, 700); }
     renderRail(sess);
     const chat = $('#chat'); if (chat) chat.scrollTop = chat.scrollHeight;
   }
@@ -2545,6 +2645,12 @@
     if (t.dataset.stab) { ui.sportTab = t.dataset.stab; render(); return refocus(`[data-stab="${ui.sportTab}"]`); }
     if (t.dataset.ntab) { ui.nutTab = t.dataset.ntab; render(); return refocus(`[data-ntab="${ui.nutTab}"]`); }
     if (t.dataset.libz) { ui.libZone = t.dataset.libz; render(); return refocus(`[data-libz="${ui.libZone}"]`); }
+    if (t.dataset.foodDel != null && sess) {
+      const L0d = lg(sess, iso(TODAY)); const [x] = (L0d.foods || []).splice(+t.dataset.foodDel, 1);
+      // Nothing left for that meal: it goes back to "not eaten yet".
+      if (x && x.slot !== 'extra' && !L0d.foods.some((y) => y.slot === x.slot) && !(L0d.photos || []).some((y) => y.slot === x.slot)) { if (x.slot === 'pdj') L0d.pdj = false; else if (L0d.eat) L0d.eat[x.slot] = false; }
+      save(); render(); return refocus('#food-name');
+    }
     if (t.dataset.eat && sess) {
       const L0e = lg(sess, iso(TODAY)); const k = t.dataset.eat;
       if (k === 'pdj') L0e.pdj = !L0e.pdj; else { L0e.eat = L0e.eat || {}; L0e.eat[k] = !L0e.eat[k]; }
@@ -2802,6 +2908,7 @@
     if (a === 'regen' && sess) { sess.seed += 1; save(); ui.printing = true; render(); ui.printing = false; }
     if (a === 'print') window.print();
     if (a === 'edit' && sess) startOnboarding(sess.id);
+    if (a === 'sport-on' && sess) { startOnboarding(sess.id); ui.ob.p.mode = 'complet'; ui.ob.step = 1; render(); refocus('#ob-title'); }
     if (a === 'new') startOnboarding(null);
     if (a === 'delete') { ui.confirmDelete = true; render(); refocus('[data-act="delete-no"]'); }
     if (a === 'delete-no') { ui.confirmDelete = false; render(); }
@@ -2810,7 +2917,7 @@
       state.sessions.forEach((s) => { s.inbox = s.inbox.filter((x) => x.fromSid !== sess.id || x.status !== 'new'); });
       state.sessions = state.sessions.filter((s) => s.id !== sess.id); state.current = state.sessions[0] ? state.sessions[0].id : null; save(); ui.view = 'today'; render();
     }
-    if (a === 'ob-back') { collect(); ui.ob.step -= 1; render(); refocus('#ob-title'); }
+    if (a === 'ob-back') { collect(); const seq = obSeq(ui.ob.p); ui.ob.step = seq[Math.max(0, seq.indexOf(ui.ob.step) - 1)]; render(); refocus('#ob-title'); }
     if (a === 'ob-cancel') { ui.ob = null; render(); }
   });
 
@@ -2842,6 +2949,13 @@
   document.addEventListener('input', (e) => {
     if (e.target.matches('[data-level]')) updateLevel(+e.target.value);
     if (e.target.id === 'niveau') $('#niveau-out').textContent = lvLabel(+e.target.value);
+    // Calories only or not: the activity question and the list of steps change right away.
+    if (e.target.name === 'mode' && ui.ob) { collect(); render(); return refocus(`[name="mode"][value="${e.target.value}"]`); }
+    // A food from the list: show the calories it will count.
+    if (e.target.form && e.target.form.id === 'food-form' && (e.target.id === 'food-name' || e.target.id === 'food-g')) {
+      const fm = e.target.form; const ff = findFood(fm.elements.aliment.value); const g = +fm.elements.g.value;
+      fm.elements.k.placeholder = ff ? `≈ ${Math.round((ff[1] * (g || ff[2])) / 100)}` : '';
+    }
     // Starting from zero: set a gentle start on screen right away (beginner, 3 sessions at most, 30 min).
     if (e.target.name === 'depart' && e.target.value === 'zero') {
       const f = e.target.form; const lv = f.querySelector('#niveau'); const pick = (n, v) => { const r = f.querySelector(`[name="${n}"][value="${v}"]`); if (r) r.checked = true; };
@@ -2936,7 +3050,20 @@
     if (e.target.id === 'ob-form') {
       collect(); const err = validate();
       if (err) { $('#ob-error').textContent = err; return; }
-      if (ui.ob.step < STEPS.length - 1) { ui.ob.step += 1; render(); refocus('#ob-title'); window.scrollTo(0, 0); } else finishOnboarding();
+      const seq = obSeq(ui.ob.p); const i = seq.indexOf(ui.ob.step);
+      if (i < seq.length - 1) { ui.ob.step = seq[i + 1]; render(); refocus('#ob-title'); window.scrollTo(0, 0); } else finishOnboarding();
+    }
+    if (e.target.id === 'food-form') {
+      const sess = cur(); if (!sess) return; const fd = new FormData(e.target); const er = $('#food-error');
+      const name = (fd.get('aliment') || '').trim(); const g = Math.round(+fd.get('g') || 0); let k = Math.round(+fd.get('k') || 0); const slot = fd.get('slot') || 'extra';
+      const f = findFood(name); const auto = !k && f; if (auto) k = Math.round((f[1] * (g || f[2])) / 100);
+      if (!name) { er.textContent = 'Écris ce que tu as mangé.'; return refocus('#food-name'); }
+      if (!k) { er.textContent = 'Indique les calories (elles sont sur l’étiquette), ou choisis un aliment de la liste.'; return refocus('#food-k'); }
+      if (k > 5000 || g > 3000) { er.textContent = 'Vérifie la quantité et les calories : elles semblent trop élevées.'; return; }
+      const L0f = lg(sess, iso(TODAY)); L0f.foods = L0f.foods || [];
+      L0f.foods.push({ at: new Date().toISOString(), slot, plat: name, g: g || (auto ? f[2] : 0), kcal: k });
+      if (slot === 'pdj') L0f.pdj = true; else if (slot !== 'extra') { L0f.eat = L0f.eat || {}; L0f.eat[slot] = true; }
+      settle(sess); render(); toast('Ajouté à ta journée.'); return refocus('#food-name');
     }
     if (e.target.id === 'chat-form') {
       const sess = cur(); const input = $('#chat-input'); const text = input.value.trim(); if (!text || !sess) return;

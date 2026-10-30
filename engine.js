@@ -276,7 +276,7 @@
 
   const lvLabel = (v) => (v < 34 ? 'Débutant' : v < 67 ? 'Intermédiaire' : 'Avancé');
   const lvIdx = (v) => (v < 34 ? 0 : v < 67 ? 1 : 2);
-  const sportName = (p) => (p.sports.length ? p.sports.join(', ').replace(/, ([^,]+)$/, ' et $1') : p.autre || 'Sport');
+  const sportName = (p) => (p.mode === 'nutri' ? 'Calories' : p.sports.length ? p.sports.join(', ').replace(/, ([^,]+)$/, ' et $1') : p.autre || 'Sport');
   // Several sports: each one in turn (i is an exercise or day index), so none is left out.
   const sportsOf = (p) => { const l = p.sports.filter((s) => SPORT[s]); return l.length ? l : ['Autre']; };
   const sportData = (p, i = 0) => { const l = sportsOf(p); return SPORT[l[i % l.length]]; };
@@ -325,6 +325,8 @@
 
   function buildPlan(sess) {
     const p = sess.profile;
+    // Calories only: no session at all.
+    if (p.mode === 'nutri') return { items: [], byDay: () => null };
     const n = Math.min(6, Math.max(2, +p.seances || 3));
     // Cardio days cycle through the cardio of each chosen sport, then an easy endurance day.
     const cardios = p.depart === 'zero' ? [START] : [...new Set(sportsOf(p).map((s) => SPORT[s].cardio)), ZONE2];
@@ -360,6 +362,8 @@
   }
 
   function activity(p) {
+    // Calories only: the everyday activity the person told us, since there are no sessions.
+    if (p.mode === 'nutri') return ({ sed: { label: 'faible', f: 1.2 }, leger: { label: 'modéré', f: 1.375 }, actif: { label: 'élevé', f: 1.55 } })[p.activite] || { label: 'faible', f: 1.2 };
     const n = +p.seances;
     if (n <= 2) return { label: 'faible', f: 1.4 };
     if (n <= 4) return { label: 'modéré', f: 1.55 };
